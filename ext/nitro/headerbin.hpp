@@ -6,7 +6,6 @@
 
 namespace nitro {
 
-
 class HeaderBin {
 public:
 	HeaderBin();

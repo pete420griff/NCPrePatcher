@@ -1,0 +1,12 @@
+[package]
+name = "unarm-c"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+unarm = { version = "1.9.1", default-features = false, features = [
+	"arm",
+	"thumb",
+	"v5te",
+] }

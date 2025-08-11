@@ -59,14 +59,6 @@ public:
     [[nodiscard]] const HeaderBin& getHeader() const { return reinterpret_cast<const HeaderBin&>(*m_bytes.data()); }
     [[nodiscard]] const Banner& getBanner() const { return reinterpret_cast<const Banner&>(m_bytes.data()[getHeader().bannerOffset]); }
 
-    // Banner banner;
-    // ArmBin arm9Rom;
-    // ArmBin arm7Rom;
-    // FNTDir fnt;
-    // FAT fat;
-    // OverlayBin arm9Ovl;
-    // OverlayBin arm7Ovl;
-
 private:
     std::vector<u8> m_bytes;
     bool m_loaded = false;
