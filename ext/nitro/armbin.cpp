@@ -13,8 +13,6 @@ namespace fs = std::filesystem;
 
 namespace nitro {
 
-ArmBin::ArmBin() = default;
-
 bool ArmBin::load(const fs::path& path, u32 entryAddr, u32 ramAddr, u32 autoLoadHookOff, bool isArm9) {
 
 	m_ramAddr = ramAddr;
@@ -25,19 +23,19 @@ bool ArmBin::load(const fs::path& path, u32 entryAddr, u32 ramAddr, u32 autoLoad
 	// READ FILE ================================
 
 	if (!fs::exists(path)) {
-		LOG_ERROR("Could not find file.");
+		// LOG_ERROR("Could not find file.");
 		return false;
 	}
 
 	uintmax_t fileSize = fs::file_size(path);
 	if (fileSize < 4) {
-		LOG_ERROR("Invalid ARM binary.");
+		// LOG_ERROR("Invalid ARM binary.");
 		return false;
 	}
 
 	std::ifstream file(path, std::ios::binary);
 	if (!file.is_open()) {
-		LOG_ERROR("Could not read file.");
+		// LOG_ERROR("Could not read file.");
 		return false;
 	}
 
@@ -66,12 +64,10 @@ bool ArmBin::load(const fs::path& path, u32 entryAddr, u32 ramAddr, u32 autoLoad
 		bytesData = m_bytes.data();
 		moduleParams = getModuleParams();
 
-		try
-		{
+		try {
 			blz::uncompressInplace(&bytesData[moduleParams->compStaticEnd - m_ramAddr]);
 		}
-		catch (const std::exception& e)
-		{
+		catch (const std::exception& e) {
 			std::ostringstream oss;
 			oss << "Failed to decompress the binary: " << e.what();
 			return false;

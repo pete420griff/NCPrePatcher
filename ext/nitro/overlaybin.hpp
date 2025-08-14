@@ -5,7 +5,6 @@
 
 #include "icodebin.hpp"
 
-// what are these for??
 #define OVERLAY_FLAG_COMP 1
 #define OVERLAY_FLAG_AUTH 2
 
@@ -25,7 +24,7 @@ struct OvtEntry {
 
 class OverlayBin : public ICodeBin {
 public:
-	OverlayBin();
+	OverlayBin() = default;
 
 	bool load(const std::filesystem::path& path, u32 ramAddress, bool compressed, int id);
 

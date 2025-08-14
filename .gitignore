@@ -1,1 +1,5 @@
 .DS_Store
+ext/nitro/build/
+*.nds
+*.dylib
+*.dll

@@ -1,7 +1,5 @@
 #include "overlaybin.hpp"
 
-#include "core/log.hpp"
-
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -13,8 +11,6 @@ namespace fs = std::filesystem;
 
 namespace nitro {
 
-OverlayBin::OverlayBin() = default;
-
 bool OverlayBin::load(const fs::path& path, u32 ramAddress, bool compressed, int id) {
 
 	m_ramAddress = ramAddress;
@@ -22,7 +18,7 @@ bool OverlayBin::load(const fs::path& path, u32 ramAddress, bool compressed, int
 	m_isDirty = false;
 
 	if (!fs::exists(path)) {
-		LOG_ERROR("Could not find file.");
+		// LOG_ERROR("Could not find file.");
 		return false;
 	}
 
@@ -30,7 +26,7 @@ bool OverlayBin::load(const fs::path& path, u32 ramAddress, bool compressed, int
 
 	std::ifstream file(path, std::ios::binary);
 	if (!file.is_open()) {
-		LOG_ERROR("File already open");
+		// LOG_ERROR("File already open");
 		return false;
 	}
 

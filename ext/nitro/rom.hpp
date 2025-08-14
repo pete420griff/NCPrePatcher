@@ -6,7 +6,7 @@
 
 namespace nitro {
 
-class NitroROM {
+class NitroRom {
 public:
     enum class LoadResult : u8 {
         Success,
@@ -38,7 +38,7 @@ public:
     struct FNTEntry {
         u8 entryType        : 1;
         u8 entryNameLength  : 7;
-        char* name;
+        u32 name; // cast to char*
     };
 
     struct FNTDirEntry : public FNTEntry {
@@ -48,7 +48,7 @@ public:
         };
     };
 
-    NitroROM() = default;
+    NitroRom() noexcept = default;
 
     LoadResult load(const std::filesystem::path& path);
 
@@ -56,8 +56,11 @@ public:
 
     [[nodiscard]] constexpr size_t size() const { return m_bytes.size(); };
     [[nodiscard]] constexpr const std::vector<u8>& data() const { return m_bytes; };
-    [[nodiscard]] const HeaderBin& getHeader() const { return reinterpret_cast<const HeaderBin&>(*m_bytes.data()); }
-    [[nodiscard]] const Banner& getBanner() const { return reinterpret_cast<const Banner&>(m_bytes.data()[getHeader().bannerOffset]); }
+
+    [[nodiscard]] const HeaderBin& getHeader() const;
+    [[nodiscard]] const Banner& getBanner() const;
+    [[nodiscard]] const FAT& getFAT() const;
+    // [[nodiscard]] const FNTEntry*& getFNT() const;
 
 private:
     std::vector<u8> m_bytes;

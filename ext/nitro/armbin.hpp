@@ -32,7 +32,8 @@ public:
 		u32 dataOff;
 	};
 
-	ArmBin();
+	ArmBin() = default;
+
 	bool load(const std::filesystem::path& path, u32 entryAddr, u32 ramAddr, u32 autoLoadHookOff, bool isArm9);
 
 	bool readBytes(u32 address, void* out, u32 size) const override;
