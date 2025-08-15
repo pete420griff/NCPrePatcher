@@ -8,8 +8,6 @@ namespace fs = std::filesystem;
 
 namespace nitro {
 
-HeaderBin::HeaderBin() = default;
-
 bool HeaderBin::load(const fs::path& path) {
 
 	if (!fs::exists(path)) {

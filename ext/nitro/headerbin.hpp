@@ -2,21 +2,16 @@
 
 #include <filesystem>
 
-#include "types.hpp"
+#include "armbin.hpp"
 
 namespace nitro {
 
 class HeaderBin {
 public:
-	HeaderBin();
-	bool load(const std::filesystem::path& path);
 
-	struct ARMBinaryInfo {
-		u32 romOffset;
-		u32 entryAddress;
-		u32 ramAddress;
-		u32 size;
-	};
+	HeaderBin() = default;
+
+	bool load(const std::filesystem::path& path);
 
 	struct DebugBinaryInfo {
 		u32 romOffset;

@@ -5,35 +5,106 @@ module NitroBind
 	ffi_lib 'libNitro.dylib'
 
 	attach_function :nitroRom_alloc, [], :pointer
-	attach_function :nitroRom_release, [ :pointer ], :void
-	attach_function :nitroRom_load, [ :pointer, :string ], :bool
-	attach_function :nitroRom_getSize, [ :pointer ], :size_t
-	attach_function :nitroRom_getGameTitle, [ :pointer ], :string
+	attach_function :nitroRom_release, [:pointer], :void
+	attach_function :nitroRom_load, [:pointer, :string], :bool
+	attach_function :nitroRom_getSize, [:pointer], :size_t
+	attach_function :nitroRom_getHeader, [:pointer], :pointer
+	attach_function :nitroRom_loadArm9, [:pointer], :pointer
+	attach_function :nitroRom_loadArm7, [:pointer], :pointer
+
+	attach_function :headerBin_alloc, [], :pointer
+	attach_function :headerBin_release, [:pointer], :void
+	attach_function :headerBin_load, [:pointer, :string], :bool
+	attach_function :headerBin_getGameTitle, [:pointer], :string
+	attach_function :headerBin_getGameCode, [:pointer], :string
+	attach_function :headerBin_getMakerCode, [:pointer], :string
+
+	attach_function :armBin_alloc, [], :pointer
+	attach_function :armBin_release, [:pointer], :void
+
+	attach_function :overlayBin_alloc, [], :pointer
+	attach_function :overlayBin_release, [:pointer], :void
 end
+
+# module UnarmBind
+# 	# extend FFI::Library
+# 	# ffi_lib 'libUnarm.dylib'
+# end
 
 module Nitro
 	extend NitroBind
 
+	class ArmBin
+		include NitroBind
+
+		def initialize(arg, is_arm9)
+			if arg.is_a? String
+				@ptr = FFI::AutoPointer.new(armBin_alloc, NitroBind.method(:armBin_release))
+				armBin_load(@ptr, arg, is_arm9)
+
+			elsif arg.is_a? FFI::AutoPointer
+				@ptr = arg
+			end
+					
+		end
+	end
+
+	class HeaderBin
+		include NitroBind
+
+		def initialize(arg)
+			if arg.is_a? String
+				@ptr = FFI::AutoPointer.new(headerBin_alloc, NitroBind.method(:headerBin_release))
+				headerBin_load(@ptr, arg)
+
+			elsif arg.is_a? FFI::Pointer
+				@ptr = arg
+			end
+		end
+
+		def game_title
+			headerBin_getGameTitle(@ptr)
+		end
+
+		def game_code
+			headerBin_getGameCode(@ptr)
+		end
+
+		def maker_code
+			headerBin_getMakerCode(@ptr)
+		end
+	end
+
 	class Rom
 		include NitroBind
 
-		def initialize(romFilePath)
+		class << self
+			alias_method :load, :new
+		end
+
+		attr_reader :header, :arm9, :arm7
+
+		def initialize(file_path)
 			@ptr = FFI::AutoPointer.new(nitroRom_alloc, NitroBind.method(:nitroRom_release))
-			nitroRom_load(@ptr, romFilePath)
+			nitroRom_load(@ptr, file_path)
+			@header = HeaderBin.new(nitroRom_getHeader(@ptr))
+			@arm9 = ArmBin.new(FFI::AutoPointer.new(nitroRom_loadArm9(@ptr), NitroBind.method(:armBin_release)), true)
+			@arm7 = ArmBin.new(FFI::AutoPointer.new(nitroRom_loadArm7(@ptr), NitroBind.method(:armBin_release)), false)
 		end
 
 		def size
 			nitroRom_getSize(@ptr)
 		end
 
-		def title
-			nitroRom_getGameTitle(@ptr)
-		end
 	end
 
 end
 
 
 if $PROGRAM_NAME == __FILE__
-	puts "Yo"
+	rom = Nitro::Rom.load("NSMB_Test.nds")
+	puts "Game title: #{rom.header.game_title}"
+	puts "Game code: #{rom.header.game_code}"
+	puts "Maker code: #{rom.header.maker_code}"
+	puts "Size: #{rom.size}"
 end
