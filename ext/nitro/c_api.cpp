@@ -92,6 +92,47 @@ extern "C" {
 		return makerCode;
 	}
 
+	DLL_EXPORT u32 headerBin_getArm9AutoLoadHookOffset(const HeaderBin* header) {
+		return header->arm9AutoLoadListHookOffset;
+	}
+
+	DLL_EXPORT u32 headerBin_getArm7AutoLoadHookOffset(const HeaderBin* header) {
+		return header->arm7AutoLoadListHookOffset;
+	}
+
+	DLL_EXPORT u32 headerBin_getArm9EntryAddress(const HeaderBin* header) {
+		return header->arm9.entryAddress;
+	}
+
+	DLL_EXPORT u32 headerBin_getArm7EntryAddress(const HeaderBin* header) {
+		return header->arm7.entryAddress;
+	}
+
+	DLL_EXPORT u32 headerBin_getArm9RamAddress(const HeaderBin* header) {
+		return header->arm9.ramAddress;
+	}
+
+	DLL_EXPORT u32 headerBin_getArm7RamAddress(const HeaderBin* header) {
+		return header->arm7.ramAddress;
+	}
+
+
+	DLL_EXPORT u64 codeBin_read64(const ICodeBin* bin, u32 address) {
+		return bin->read<u64>(address);
+	}
+
+	DLL_EXPORT u32 codeBin_read32(const ICodeBin* bin, u32 address) {
+		return bin->read<u32>(address);
+	}
+
+	DLL_EXPORT u16 codeBin_read16(const ICodeBin* bin, u32 address) {
+		return bin->read<u16>(address);
+	}
+
+	DLL_EXPORT u8 codeBin_read8(const ICodeBin* bin, u32 address) {
+		return bin->read<u8>(address);
+	}
+
 
 	DLL_EXPORT ArmBin* armBin_alloc() {
 		return new ArmBin;

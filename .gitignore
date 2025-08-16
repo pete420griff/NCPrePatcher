@@ -3,3 +3,4 @@ ext/nitro/build/
 *.nds
 *.dylib
 *.dll
+*.ps1
