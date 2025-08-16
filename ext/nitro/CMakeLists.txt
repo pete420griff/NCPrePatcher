@@ -1,7 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
-project(Nitro LANGUAGES CXX)
 
-add_library(Nitro SHARED
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+project(nitro VERSION 0.0.1)
+
+add_library(${PROJECT_NAME} SHARED
     c_api.cpp
     rom.cpp
     armbin.cpp
@@ -10,4 +14,4 @@ add_library(Nitro SHARED
     blz.cpp
 )
 
-target_compile_features(Nitro PUBLIC cxx_std_20)
+target_compile_features(${PROJECT_NAME} PUBLIC)

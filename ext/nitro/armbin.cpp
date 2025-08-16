@@ -56,7 +56,7 @@ bool ArmBin::load(const fs::path& path, u32 entryAddr, u32 ramAddr, u32 autoLoad
 	// DECOMPRESS ================================
 
 	if (moduleParams->compStaticEnd) {
-		std::cout << "Decompressing..." << std::endl;
+		std::cout << "Decompressing arm" << (isArm9 ? "9" : "7") << " binary..." << std::endl;
 
 		u32 decompSize = static_cast<u32>(fileSize) + *reinterpret_cast<u32*>(&bytesData[moduleParams->compStaticEnd - m_ramAddr - 4]);
 
@@ -105,7 +105,7 @@ bool ArmBin::load(const u8* romPtr, const ARMBinaryInfo& info, u32 autoLoadHookO
 	ModuleParams* moduleParams = getModuleParams();
 
 	if (moduleParams->compStaticEnd) {
-		std::cout << "Decompressing..." << std::endl;
+		std::cout << "Decompressing arm" << (isArm9 ? "9" : "7") << " binary..." << std::endl;
 
 		u32 decompSize = static_cast<u32>(info.size) + *reinterpret_cast<u32*>(&bytesData[moduleParams->compStaticEnd - m_ramAddr - 4]);
 

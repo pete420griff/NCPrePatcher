@@ -2,7 +2,7 @@ require 'ffi'
 
 module NitroBind
 	extend FFI::Library
-	ffi_lib 'libNitro.dylib'
+	ffi_lib ['nitro.dll', Dir.pwd + '/nitro.dll', 'nitro.dylib', 'nitro.so']
 
 	attach_function :nitroRom_alloc, [], :pointer
 	attach_function :nitroRom_release, [:pointer], :void
@@ -102,9 +102,9 @@ end
 
 
 if $PROGRAM_NAME == __FILE__
-	rom = Nitro::Rom.load("NSMB_Test.nds")
+	rom = Nitro::Rom.load(ARGV.length == 0 ? "NSMB.nds" : ARGV[0])
 	puts "Game title: #{rom.header.game_title}"
 	puts "Game code: #{rom.header.game_code}"
 	puts "Maker code: #{rom.header.maker_code}"
-	puts "Size: #{rom.size}"
+	puts "Size: #{(rom.size / 1024.0 / 1024.0).round(2)} MB"
 end
