@@ -39,7 +39,7 @@ const NitroRom::Banner& NitroRom::getBanner() const {
 }
 
 const NitroRom::FATEntry& NitroRom::getFATEntry(u32 index) const {
-	return reinterpret_cast<const FATEntry*>(m_bytes.data()[getHeader().fat.romOffset])[index];
+	return reinterpret_cast<const FATEntry*>(&m_bytes.data()[getHeader().fat.romOffset])[index];
 }
 
 const void* NitroRom::getFile(u32 id) const {
@@ -51,11 +51,19 @@ u32 NitroRom::getFileSize(u32 id) const {
 }
 
 const OvtEntry& NitroRom::getArm9OvtEntry(u32 index) const {
-	return reinterpret_cast<const OvtEntry&>(m_bytes.data()[getHeader().arm9OvT.romOffset]);
+	return reinterpret_cast<const OvtEntry*>(&m_bytes.data()[getHeader().arm9OvT.romOffset])[index];
 }
 
 const OvtEntry& NitroRom::getArm7OvtEntry(u32 index) const {
-	return reinterpret_cast<const OvtEntry&>(m_bytes.data()[getHeader().arm7OvT.romOffset]);
+	return reinterpret_cast<const OvtEntry*>(&m_bytes.data()[getHeader().arm7OvT.romOffset])[index];
+}
+
+u32 NitroRom::getArm9OverlayCount() const {
+	return getHeader().arm9OvT.size / sizeof(OvtEntry);
+}
+
+u32 NitroRom::getArm7OverlayCount() const {
+	return getHeader().arm7OvT.size / sizeof(OvtEntry);
 }
 
 } // nitro

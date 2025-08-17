@@ -61,9 +61,11 @@ public:
     [[nodiscard]] const Banner& getBanner() const;
     [[nodiscard]] const FATEntry& getFATEntry(u32 index) const;
     [[nodiscard]] const void* getFile(u32 id) const;
-    [[nodiscard]] u32 getFileSize(u32 id) const;
     [[nodiscard]] const OvtEntry& getArm9OvtEntry(u32 index) const;
     [[nodiscard]] const OvtEntry& getArm7OvtEntry(u32 index) const;
+    u32 getFileSize(u32 id) const;
+    u32 getArm9OverlayCount() const;
+    u32 getArm7OverlayCount() const;
 
 private:
     std::vector<u8> m_bytes;

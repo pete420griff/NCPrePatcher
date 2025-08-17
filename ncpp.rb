@@ -8,7 +8,7 @@ end
 
 module NitroBind
   extend FFI::Library
-  ffi_lib ['nitro.dll', Dir.pwd + '/nitro.dll', 'nitro.dylib', 'nitro.so']
+  ffi_lib ['nitro', Dir.pwd + '/nitro']
 
   attach_function :nitroRom_alloc, [], :pointer
   attach_function :nitroRom_release, [:pointer], :void
@@ -21,6 +21,8 @@ module NitroBind
   attach_function :nitroRom_loadArm7, [:pointer], :pointer
   attach_function :nitroRom_loadArm9Overlay, [:pointer, :uint32], :pointer
   attach_function :nitroRom_loadArm7Overlay, [:pointer, :uint32], :pointer
+  attach_function :nitroRom_getArm9OverlayCount, [:pointer], :uint32
+  attach_function :nitroRom_getArm7OverlayCount, [:pointer], :uint32
 
   attach_function :headerBin_alloc, [], :pointer
   attach_function :headerBin_release, [:pointer], :void
@@ -79,6 +81,10 @@ module Nitro
     def initialize(args = {})
       if args.has_key? :file_path
         @ptr = FFI::AutoPointer.new(armBin_alloc, NitroBind.method(:armBin_release))
+        if not File.exist? args[:file_path]
+          puts "Error: #{args[:file_path]} does not exist"
+          raise "ArmBin initialization failed"
+        end
         armBin_load(@ptr, args[:file_path], args[:entry_addr], args[:ram_addr], args[:auto_load_hook_offset], args[:is_arm9] || true)
 
       elsif args.has_key? :ptr and args[:ptr].is_a? FFI::AutoPointer
@@ -87,8 +93,33 @@ module Nitro
       else
         raise ArgumentError
       end
-          
     end
+
+  end
+
+  class OverlayBin < CodeBin
+    include NitroBind
+
+    attr_reader :id
+
+    def initialize(id, args = {})
+      @id = id
+      if args.has_key? :file_path
+        @ptr = FFI::AutoPointer.new(overlayBin_alloc, NitroBind.method(:overlayBin_release))
+        if not File.exist? args[:file_path]
+          puts "Error: #{args[:file_path]} does not exist"
+          raise "OverlayBin initialization failed"
+        end
+        overlayBin_load(@ptr, args[:file_path], args[:ram_addr], args[:is_compressed], @id)
+
+      elsif args.has_key? :ptr and args[:ptr].is_a? FFI::AutoPointer
+        @ptr = args[:ptr]
+
+      else
+        raise ArgumentError
+      end
+    end
+
   end
 
   class HeaderBin
@@ -97,8 +128,11 @@ module Nitro
     def initialize(arg)
       if arg.is_a? String
         @ptr = FFI::AutoPointer.new(headerBin_alloc, NitroBind.method(:headerBin_release))
+        if not File.exist? arg
+          puts "Error: #{arg} does not exist"
+          raise "HeaderBin initialization failed"
+        end
         headerBin_load(@ptr, arg)
-
       elsif arg.is_a? FFI::Pointer
         @ptr = arg
       end
@@ -155,19 +189,73 @@ module Nitro
       alias_method :load, :new
     end
 
-    attr_reader :header, :arm9, :arm7
+    attr_reader :header, :arm9, :arm7, :arm9_ov_count, :arm7_ov_count
 
     def initialize(file_path)
       @ptr = FFI::AutoPointer.new(nitroRom_alloc, NitroBind.method(:nitroRom_release))
+      if not File.exist? file_path
+        puts "Error: #{file_path} does not exist"
+        raise "Rom initialization failed"
+      end
       nitroRom_load(@ptr, file_path)
       @header = HeaderBin.new(nitroRom_getHeader(@ptr))
       @arm9 = ArmBin.new(ptr: FFI::AutoPointer.new(nitroRom_loadArm9(@ptr), NitroBind.method(:armBin_release)))
       @arm7 = ArmBin.new(ptr: FFI::AutoPointer.new(nitroRom_loadArm7(@ptr), NitroBind.method(:armBin_release)))
+      @arm9_ov_count = nitroRom_getArm9OverlayCount(@ptr)
+      @arm7_ov_count = nitroRom_getArm7OverlayCount(@ptr)
+      @arm9_overlays = Array.new(@arm9_ov_count)
+      @arm7_overlays = Array.new(@arm7_ov_count)
     end
 
     def size
       nitroRom_getSize(@ptr)
     end
+
+    def get_file(id)
+      nitroRom_getFile(id)
+    end
+
+    def get_file_size(id)
+      nitroRom_getFileSize(id)
+    end
+
+    def load_arm9_overlay(id)
+      raise IndexError if id > @arm9_ov_count-1
+      @arm9_overlays[id] = OverlayBin.new(id, ptr: FFI::AutoPointer.new(nitroRom_loadArm9Overlay(@ptr, id), NitroBind.method(:overlayBin_release)))
+    end
+    alias_method :load_arm9_ov, :load_arm9_overlay
+
+    def load_arm7_overlay(id)
+      raise IndexError if id > @arm7_ov_count-1
+      @arm7_overlays[id] = OverlayBin.new(id, ptr: FFI::AutoPointer.new(nitroRom_loadArm7Overlay(@ptr, id), NitroBind.method(:overlayBin_release)))
+    end
+    alias_method :load_arm7_ov, :load_arm7_overlay
+
+    def load_overlay(id, arm9 = true)
+      arm9 ? load_arm9_overlay(id) : load_arm7_overlay(id)
+    end
+    alias_method :load_ov, :load_overlay
+
+    def get_arm9_overlay(id)
+      raise IndexError if id > @arm9_ov_count-1
+      ov = @arm9_overlays[id]
+      load_arm9_overlay(id) if ov == nil
+      ov
+    end
+    alias_method :get_arm9_ov, :get_arm9_overlay
+
+    def get_arm7_overlay(id)
+      raise IndexError if id > @arm7_ov_count-1
+      ov = @arm7_overlays[id]
+      load_arm7_overlay(id) if ov == nil
+      ov
+    end
+    alias_method :get_arm7_ov, :get_arm7_overlay
+
+    def get_overlay(id, arm9 = true)
+      arm9 ? get_arm9_overlay(id) : get_arm7_overlay(id)
+    end
+    alias_method :get_ov, :get_overlay
 
   end
 
@@ -181,4 +269,8 @@ if $PROGRAM_NAME == __FILE__
   puts "Maker code: #{rom.header.maker_code}"
   puts "Size: #{(rom.size / 1024.0 / 1024.0).round(2)} MB"
   puts "Arm9 at 0x1ff8000: " + rom.arm9.read32(0x01ff8000).to_hex
+  puts "Arm9 overlay count: #{rom.arm9_ov_count}"
+  puts "Arm7 overlay count: #{rom.arm7_ov_count}"
+  rom.load_arm9_ov(1)
+  puts "Ov1 at 0x020CC2E0: " + rom.get_arm9_ov(1).read32(0x020CC2E0).to_hex
 end

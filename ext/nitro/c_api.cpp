@@ -73,6 +73,14 @@ extern "C" {
 		return ov;
 	}
 
+	DLL_EXPORT u32 nitroRom_getArm9OverlayCount(const NitroRom* rom) {
+		return rom->getArm9OverlayCount();
+	}
+
+	DLL_EXPORT u32 nitroRom_getArm7OverlayCount(const NitroRom* rom) {
+		return rom->getArm7OverlayCount();
+	}
+
 
 	DLL_EXPORT HeaderBin* headerBin_alloc() {
 		return new HeaderBin;
@@ -98,10 +106,10 @@ extern "C" {
 
 	DLL_EXPORT const char* headerBin_getGameCode(const HeaderBin* header) {
 		static char gameCode[5];
-		
+
 		for (u32 i = 0; i < 4; i++)
 			gameCode[i] = header->gameCode[i];
-		
+
 		gameCode[4] = '\0';
 		return gameCode;
 	}
