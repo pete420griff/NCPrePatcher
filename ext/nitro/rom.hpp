@@ -24,7 +24,7 @@ public:
         u8 iconPltt[0x20];
     };
 
-    struct FAT {
+    struct FATEntry {
         u32 start;  // top address of file
         u32 end;    // bottom address
     };
@@ -59,8 +59,11 @@ public:
 
     [[nodiscard]] const HeaderBin& getHeader() const;
     [[nodiscard]] const Banner& getBanner() const;
-    [[nodiscard]] const FAT& getFAT() const;
-    // [[nodiscard]] const FNTEntry*& getFNT() const;
+    [[nodiscard]] const FATEntry& getFATEntry(u32 index) const;
+    [[nodiscard]] const void* getFile(u32 id) const;
+    [[nodiscard]] u32 getFileSize(u32 id) const;
+    [[nodiscard]] const OvtEntry& getArm9OvtEntry(u32 index) const;
+    [[nodiscard]] const OvtEntry& getArm7OvtEntry(u32 index) const;
 
 private:
     std::vector<u8> m_bytes;

@@ -35,15 +35,27 @@ const HeaderBin& NitroRom::getHeader() const {
 }
 
 const NitroRom::Banner& NitroRom::getBanner() const {
-	return reinterpret_cast<const NitroRom::Banner&>(m_bytes.data()[getHeader().bannerOffset]);
+	return reinterpret_cast<const Banner&>(m_bytes.data()[getHeader().bannerOffset]);
 }
 
-const NitroRom::FAT& NitroRom::getFAT() const {
-	return reinterpret_cast<const NitroRom::FAT&>(m_bytes.data()[getHeader().fat.romOffset]);
+const NitroRom::FATEntry& NitroRom::getFATEntry(u32 index) const {
+	return reinterpret_cast<const FATEntry*>(m_bytes.data()[getHeader().fat.romOffset])[index];
 }
 
-// const NitroRom::FNTEntry*& NitroRom::getFNT() const {
-// 	return reinterpret_cast<const NitroRom::FNTEntry*&>(m_bytes.data()[getHeader().fnt.romOffset]);
-// }
+const void* NitroRom::getFile(u32 id) const {
+	return static_cast<const void*>(&m_bytes.data()[getFATEntry(id).start]);
+}
+
+u32 NitroRom::getFileSize(u32 id) const {
+	return getFATEntry(id).end - getFATEntry(id).start;
+}
+
+const OvtEntry& NitroRom::getArm9OvtEntry(u32 index) const {
+	return reinterpret_cast<const OvtEntry&>(m_bytes.data()[getHeader().arm9OvT.romOffset]);
+}
+
+const OvtEntry& NitroRom::getArm7OvtEntry(u32 index) const {
+	return reinterpret_cast<const OvtEntry&>(m_bytes.data()[getHeader().arm7OvT.romOffset]);
+}
 
 } // nitro

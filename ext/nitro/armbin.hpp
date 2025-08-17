@@ -6,7 +6,7 @@
 #include <exception>
 
 #include "icodebin.hpp"
-#include "types.hpp"
+#include "common.hpp"
 
 namespace nitro {
 

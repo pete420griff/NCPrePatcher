@@ -15,8 +15,12 @@ module NitroBind
   attach_function :nitroRom_load, [:pointer, :string], :bool
   attach_function :nitroRom_getSize, [:pointer], :size_t
   attach_function :nitroRom_getHeader, [:pointer], :pointer
+  attach_function :nitroRom_getFile, [:pointer, :uint32], :pointer
+  attach_function :nitroRom_getFileSize, [:pointer, :uint32], :uint32
   attach_function :nitroRom_loadArm9, [:pointer], :pointer
   attach_function :nitroRom_loadArm7, [:pointer], :pointer
+  attach_function :nitroRom_loadArm9Overlay, [:pointer, :uint32], :pointer
+  attach_function :nitroRom_loadArm7Overlay, [:pointer, :uint32], :pointer
 
   attach_function :headerBin_alloc, [], :pointer
   attach_function :headerBin_release, [:pointer], :void
@@ -38,9 +42,12 @@ module NitroBind
 
   attach_function :armBin_alloc, [], :pointer
   attach_function :armBin_release, [:pointer], :void
+  attach_function :armBin_load, [:pointer, :string, :uint32, :uint32, :uint32, :bool], :bool
 
   attach_function :overlayBin_alloc, [], :pointer
   attach_function :overlayBin_release, [:pointer], :void
+  attach_function :overlayBin_load, [:pointer, :string, :uint32, :bool, :int32], :bool
+
 end
 
 module Nitro

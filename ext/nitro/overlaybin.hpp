@@ -26,7 +26,8 @@ class OverlayBin : public ICodeBin {
 public:
 	OverlayBin() = default;
 
-	bool load(const std::filesystem::path& path, u32 ramAddress, bool compressed, int id);
+	bool load(const std::filesystem::path& path, u32 ramAddress, bool compressed, s32 id);
+	bool load(const u8* ovPtr, const OvtEntry& ovte);
 
 	bool readBytes(u32 address, void* out, u32 size) const override;
 	bool writeBytes(u32 address, const void* data, u32 size) override;
@@ -42,7 +43,7 @@ public:
 private:
 	std::vector<u8> m_bytes;
 	u32 m_ramAddress;
-	int m_id;
+	s32 m_id;
 	bool m_isDirty;
 	std::vector<u8> m_backupData;
 };

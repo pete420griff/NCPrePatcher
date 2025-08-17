@@ -11,26 +11,16 @@ namespace fs = std::filesystem;
 
 namespace nitro {
 
-bool OverlayBin::load(const fs::path& path, u32 ramAddress, bool compressed, int id) {
+bool OverlayBin::load(const fs::path& path, u32 ramAddress, bool compressed, s32 id) {
 
 	m_ramAddress = ramAddress;
 	m_id = id;
 	m_isDirty = false;
 
-	if (!fs::exists(path)) {
-		// LOG_ERROR("Could not find file.");
-		return false;
-	}
-
 	uintmax_t fileSize = fs::file_size(path);
-
 	std::ifstream file(path, std::ios::binary);
-	if (!file.is_open()) {
-		// LOG_ERROR("File already open");
-		return false;
-	}
 
-	if (fileSize == 0)
+	if (!fs::exists(path) || !file.is_open() || fileSize == 0)
 		return false;
 
 	m_bytes.resize(fileSize);
@@ -41,6 +31,23 @@ bool OverlayBin::load(const fs::path& path, u32 ramAddress, bool compressed, int
 		blz::uncompressInplace(m_bytes);
 
 	return true;
+}
+
+bool OverlayBin::load(const u8* ovPtr, const OvtEntry& ovte) {
+
+	m_ramAddress = ovte.ramAddress;
+	m_id = ovte.overlayID;
+	m_isDirty = false;
+
+	bool compressed = ovte.flag & OVERLAY_FLAG_COMP;
+
+	m_bytes.assign(ovPtr, ovPtr + (compressed ? ovte.compressed : ovte.ramSize));
+
+	if (compressed)
+		blz::uncompressInplace(m_bytes);
+
+	return true;
+
 }
 
 bool OverlayBin::readBytes(u32 address, void* out, u32 size) const {
@@ -59,8 +66,7 @@ bool OverlayBin::readBytes(u32 address, void* out, u32 size) const {
 bool OverlayBin::writeBytes(u32 address, const void* data, u32 size) {
 
 	u32 binAddress = address - m_ramAddress;
-	if (binAddress + size > m_bytes.size())
-	{
+	if (binAddress + size > m_bytes.size()) {
 		std::ostringstream oss;
 		oss << "Failed to write to overlay " << m_id << ", writing " << size << " byte(s) to address 0x" <<
 			std::uppercase << std::hex << address << std::nouppercase << " exceeds range.";

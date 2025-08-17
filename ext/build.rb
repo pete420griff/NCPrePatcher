@@ -35,10 +35,8 @@ NITRO_LIB_NAME = 'nitro' + LIB_EXT
 def config_nitro
   # Create build folder if it doesn't exist
   Dir.mkdir(NITRO_BUILD_PATH) unless Dir.exist? NITRO_BUILD_PATH
-  
   # Configure CMake
   Dir.chdir(NITRO_BUILD_PATH) do
-    `cmake ..`
     out, status = Open3.capture2e('cmake', '..')
     puts out
     unless status.success?
@@ -46,7 +44,6 @@ def config_nitro
       raise "CMake configuration failed"
     end
   end
-
 end
 
 def build_nitro

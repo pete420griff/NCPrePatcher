@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "types.hpp"
+#include "common.hpp"
 
 namespace nitro {
 

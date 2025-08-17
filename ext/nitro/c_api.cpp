@@ -4,9 +4,9 @@
 #include "headerbin.hpp"
 
 #if defined(_MSC_VER) || defined(__MINGW32__)
-  #define DLL_EXPORT __declspec(dllexport)
+	#define DLL_EXPORT __declspec(dllexport)
 #else
-  #define DLL_EXPORT
+	#define DLL_EXPORT
 #endif
 
 namespace fs = std::filesystem;
@@ -39,6 +39,14 @@ extern "C" {
 		return &rom->getHeader();
 	}
 
+	DLL_EXPORT const void* nitroRom_getFile(const NitroRom* rom, u32 id) {
+		return rom->getFile(id);
+	}
+
+	DLL_EXPORT u32 nitroRom_getFileSize(const NitroRom* rom, u32 id) {
+		return rom->getFileSize(id);
+	}
+
 	DLL_EXPORT ArmBin* nitroRom_loadArm9(NitroRom* rom) {
 		ArmBin* arm = new ArmBin;
 		arm->load(rom->data().data(), rom->getHeader().arm9, rom->getHeader().arm9AutoLoadListHookOffset, true);
@@ -49,6 +57,20 @@ extern "C" {
 		ArmBin* arm = new ArmBin;
 		arm->load(rom->data().data(), rom->getHeader().arm7, rom->getHeader().arm7AutoLoadListHookOffset, false);
 		return arm;
+	}
+
+	DLL_EXPORT OverlayBin* nitroRom_loadArm9Overlay(NitroRom* rom, u32 id) {
+		OverlayBin* ov = new OverlayBin;
+		const OvtEntry& ovte = rom->getArm9OvtEntry(id);
+		ov->load(static_cast<const u8*>(rom->getFile(ovte.fileID)), ovte);
+		return ov;
+	}
+
+	DLL_EXPORT OverlayBin* nitroRom_loadArm7Overlay(NitroRom* rom, u32 id) {
+		OverlayBin* ov = new OverlayBin;
+		const OvtEntry& ovte = rom->getArm7OvtEntry(id);
+		ov->load(static_cast<const u8*>(rom->getFile(ovte.fileID)), ovte);
+		return ov;
 	}
 
 
@@ -155,8 +177,8 @@ extern "C" {
 		delete ov;
 	}
 
-	DLL_EXPORT bool overlayBin_load(OverlayBin* ov, const char* filePath) {
-		return false;
+	DLL_EXPORT bool overlayBin_load(OverlayBin* ov, const char* filePath, u32 ramAddress, bool compressed, s32 id) {
+		return ov->load(filePath, ramAddress, compressed, id);
 	}
 
 }
