@@ -1,0 +1,13 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    ffi (1.17.2-x64-mingw-ucrt)
+
+PLATFORMS
+  x64-mingw-ucrt
+
+DEPENDENCIES
+  ffi (~> 1.17, >= 1.17.2)
+
+BUNDLED WITH
+   2.6.9
