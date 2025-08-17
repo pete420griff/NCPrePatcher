@@ -1,6 +1,8 @@
-.DS_Store
 ext/nitro/build/
 *.nds
+*.bin
 *.dylib
 *.dll
+*.so
 *.ps1
+.DS_Store
