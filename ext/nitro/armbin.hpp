@@ -45,6 +45,9 @@ public:
 
 	bool readBytes(u32 address, void* out, u32 size) const override;
 	bool writeBytes(u32 address, const void* data, u32 size) override;
+	
+	u32 getSize() const override { return static_cast<u32>(m_bytes.size()); }
+	u32 getStartAddress() const override { return m_ramAddr; }
 
 	void refreshAutoloadData();
 
@@ -53,7 +56,7 @@ public:
 
 	[[nodiscard]] constexpr bool sanityCheckAddress(u32 addr) const;
 
-	[[nodiscard]] constexpr u32 getRamAddress() const { return m_ramAddr; }
+	[[nodiscard]] constexpr u32 getEntryPointAddress() const { return m_entryAddr; }
 
 	[[nodiscard]] constexpr std::vector<u8>& data() { return m_bytes; }
 	[[nodiscard]] constexpr const std::vector<u8>& data() const { return m_bytes; }

@@ -59,26 +59,15 @@ extern "C" {
 		return arm;
 	}
 
-	DLL_EXPORT OverlayBin* nitroRom_loadArm9Overlay(NitroRom* rom, u32 id) {
+	DLL_EXPORT OverlayBin* nitroRom_loadOverlay(NitroRom* rom, u32 id) {
 		OverlayBin* ov = new OverlayBin;
-		const OvtEntry& ovte = rom->getArm9OvtEntry(id);
+		const OvtEntry& ovte = rom->getOvtEntry(id);
 		ov->load(static_cast<const u8*>(rom->getFile(ovte.fileID)), ovte);
 		return ov;
 	}
 
-	DLL_EXPORT OverlayBin* nitroRom_loadArm7Overlay(NitroRom* rom, u32 id) {
-		OverlayBin* ov = new OverlayBin;
-		const OvtEntry& ovte = rom->getArm7OvtEntry(id);
-		ov->load(static_cast<const u8*>(rom->getFile(ovte.fileID)), ovte);
-		return ov;
-	}
-
-	DLL_EXPORT u32 nitroRom_getArm9OverlayCount(const NitroRom* rom) {
-		return rom->getArm9OverlayCount();
-	}
-
-	DLL_EXPORT u32 nitroRom_getArm7OverlayCount(const NitroRom* rom) {
-		return rom->getArm7OverlayCount();
+	DLL_EXPORT u32 nitroRom_getOverlayCount(const NitroRom* rom) {
+		return rom->getOverlayCount();
 	}
 
 
@@ -163,6 +152,14 @@ extern "C" {
 		return bin->read<u8>(address);
 	}
 
+	DLL_EXPORT u32 codeBin_getStartAddress(const ICodeBin* bin) {
+		return bin->getStartAddress();
+	}
+
+	DLL_EXPORT u32 codeBin_getSize(const ICodeBin* bin) {
+		return bin->getSize();
+	}
+
 
 	DLL_EXPORT ArmBin* armBin_alloc() {
 		return new ArmBin;
@@ -174,6 +171,10 @@ extern "C" {
 
 	DLL_EXPORT bool armBin_load(ArmBin* arm, const char* filePath, u32 entryAddr, u32 ramAddr, u32 autoLoadHookOffset, bool arm9 = true) {
 		return arm->load(fs::path(filePath), entryAddr, ramAddr, autoLoadHookOffset, arm9);
+	}
+
+	DLL_EXPORT u32 armBin_getEntryPointAddress(const ArmBin* arm) {
+		return arm->getEntryPointAddress();
 	}
 
 

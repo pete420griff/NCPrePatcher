@@ -8,6 +8,8 @@ class ICodeBin {
 public:
 	virtual bool readBytes(u32 address, void* out, u32 size) const = 0;
 	virtual bool writeBytes(u32 address, const void* data, u32 size) = 0;
+	virtual u32 getSize() const = 0;
+	virtual u32 getStartAddress() const = 0;
 
 	template<typename T>
 	T read(u32 address) const {

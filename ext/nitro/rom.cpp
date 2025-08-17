@@ -50,20 +50,12 @@ u32 NitroRom::getFileSize(u32 id) const {
 	return getFATEntry(id).end - getFATEntry(id).start;
 }
 
-const OvtEntry& NitroRom::getArm9OvtEntry(u32 index) const {
+const OvtEntry& NitroRom::getOvtEntry(u32 index) const {
 	return reinterpret_cast<const OvtEntry*>(&m_bytes.data()[getHeader().arm9OvT.romOffset])[index];
 }
 
-const OvtEntry& NitroRom::getArm7OvtEntry(u32 index) const {
-	return reinterpret_cast<const OvtEntry*>(&m_bytes.data()[getHeader().arm7OvT.romOffset])[index];
-}
-
-u32 NitroRom::getArm9OverlayCount() const {
+u32 NitroRom::getOverlayCount() const {
 	return getHeader().arm9OvT.size / sizeof(OvtEntry);
-}
-
-u32 NitroRom::getArm7OverlayCount() const {
-	return getHeader().arm7OvT.size / sizeof(OvtEntry);
 }
 
 } // nitro
