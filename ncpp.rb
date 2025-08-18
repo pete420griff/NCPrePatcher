@@ -53,6 +53,15 @@ module NitroBind
 
 end
 
+module UnarmBind
+  extend FFI::Library
+  ffi_lib ['unarm', Dir.pwd + '/unarm']
+
+  attach_function :disasm_arm_ins, [:uint32], :string
+  attach_function :free_c_str, [:string], :void
+
+end
+
 module Nitro
   extend NitroBind
 
@@ -83,6 +92,11 @@ module Nitro
       codeBin_getStartAddress(@ptr)
     end
     alias_method :start_addr, :start_address
+
+    def end_address
+      start_address + size
+    end
+    alias_method :end_addr, :end_address
 
   end
 
@@ -254,7 +268,46 @@ private
         self.class.define_method(:"overlay#{id}") do
           get_overlay(id)
         end
+        self.class.define_method(:"ov#{id}") do
+          get_overlay(id)
+        end
       end
+    end
+
+  end
+
+end
+
+module Unarm
+  extend UnarmBind
+
+  class Ins
+
+    class << self
+      alias_method :disasm, :new
+    end
+
+    attr_reader :str, :raw
+    alias_method :string, :str
+
+  end
+
+  class ArmIns < Ins
+    include UnarmBind
+
+    def initialize(ins)
+      @raw = ins
+      @str = disasm_arm_ins(ins)
+    end
+
+  end
+
+  class ThumbIns < Ins
+    include UnarmBind
+
+    def initialize(ins)
+      @raw = ins
+      # TODO
     end
 
   end
@@ -268,7 +321,9 @@ if $PROGRAM_NAME == __FILE__
   puts "Game code: #{rom.header.game_code}"
   puts "Maker code: #{rom.header.maker_code}"
   puts "Size: #{(rom.size / 1024.0 / 1024.0).round(2)} MB"
-  puts "Arm9 at 0x1ff8000: " + rom.arm9.read32(0x01ff8000).to_hex
-  puts "Arm9 overlay count: #{rom.overlay_count}"
-  puts "Ov0 at #{rom.overlay0.start_addr.to_hex}: " + rom.overlay0.read32(rom.overlay0.start_addr).to_hex
+  puts "Arm9 at #{rom.arm9.start_addr.to_hex}: " + rom.arm9.read32(rom.arm9.start_addr).to_hex
+  puts "Overlay count: #{rom.overlay_count}"
+  puts "Ov0 at #{rom.ov0.start_addr.to_hex}: " + rom.overlay0.read32(rom.overlay0.start_addr).to_hex
+
+  puts "Ov10 at #{rom.ov10.start_addr.to_hex}: " + Unarm::ArmIns.new(rom.ov10.read32(rom.ov10.start_addr)).string
 end

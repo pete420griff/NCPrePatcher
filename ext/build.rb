@@ -32,6 +32,9 @@ LIB_EXT = case
 NITRO_BUILD_PATH = 'nitro/build/'
 NITRO_LIB_NAME = 'nitro' + LIB_EXT
 
+UNARM_BUILD_PATH = 'unarm/'
+UNARM_LIB_NAME = 'unarm_c' + LIB_EXT
+
 def config_nitro
   # Create build folder if it doesn't exist
   Dir.mkdir(NITRO_BUILD_PATH) unless Dir.exist? NITRO_BUILD_PATH
@@ -67,7 +70,42 @@ def build_nitro
   end
 end
 
+def build_unarm
+  Dir.chdir(UNARM_BUILD_PATH) do
+    out, status = Open3.capture2e('cargo', 'build', '--release')
+    puts out
+    unless status.success?
+      puts "Error: Cargo command failed with status #{status.exitstatus}"
+      raise "Cargo build failed"
+    end
+  end
+
+  lib_path = UNARM_BUILD_PATH + 'target/release/' + UNARM_LIB_NAME
+  lib_dest = '../unarm' + LIB_EXT
+  puts "Moving #{lib_path} to #{lib_dest}"
+  begin
+    FileUtils.move lib_path, lib_dest
+  rescue
+    puts "Error: file not found at #{lib_path}"
+  end
+end
+
 if $PROGRAM_NAME == __FILE__
-  config_nitro unless Dir.exist? NITRO_BUILD_PATH and ARGV[0] != '--config'
+  if not Dir.exist? NITRO_BUILD_PATH or ARGV.include? '--config'
+    config_nitro
+  end
+
+  if ARGV.include? 'nitro'
+    build_nitro
+    return
+  end
+
+  if ARGV.include? 'unarm'
+    build_unarm
+    return
+  end
+
   build_nitro
+  puts
+  build_unarm
 end
