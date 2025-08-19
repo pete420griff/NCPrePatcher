@@ -10,46 +10,50 @@ module NitroBind
   extend FFI::Library
   ffi_lib ['nitro', Dir.pwd + '/nitro']
 
-  attach_function :nitroRom_alloc, [], :pointer
-  attach_function :nitroRom_release, [:pointer], :void
-  attach_function :nitroRom_load, [:pointer, :string], :bool
-  attach_function :nitroRom_getSize, [:pointer], :size_t
-  attach_function :nitroRom_getHeader, [:pointer], :pointer
-  attach_function :nitroRom_getFile, [:pointer, :uint32], :pointer
-  attach_function :nitroRom_getFileSize, [:pointer, :uint32], :uint32
-  attach_function :nitroRom_loadArm9, [:pointer], :pointer
-  attach_function :nitroRom_loadArm7, [:pointer], :pointer
-  attach_function :nitroRom_loadOverlay, [:pointer, :uint32], :pointer
-  attach_function :nitroRom_getOverlayCount, [:pointer], :uint32
+  typedef :pointer, :rom_handle
+  typedef :pointer, :header_handle
+  typedef :pointer, :codebin_handle
 
-  attach_function :headerBin_alloc, [], :pointer
-  attach_function :headerBin_release, [:pointer], :void
-  attach_function :headerBin_load, [:pointer, :string], :bool
-  attach_function :headerBin_getGameTitle, [:pointer], :string
-  attach_function :headerBin_getGameCode, [:pointer], :string
-  attach_function :headerBin_getMakerCode, [:pointer], :string
-  attach_function :headerBin_getArm9AutoLoadHookOffset, [:pointer], :uint32
-  attach_function :headerBin_getArm7AutoLoadHookOffset, [:pointer], :uint32
-  attach_function :headerBin_getArm9EntryAddress, [:pointer], :uint32
-  attach_function :headerBin_getArm7EntryAddress, [:pointer], :uint32
-  attach_function :headerBin_getArm9RamAddress, [:pointer], :uint32
-  attach_function :headerBin_getArm7RamAddress, [:pointer], :uint32
+  attach_function :nitroRom_alloc, [], :rom_handle
+  attach_function :nitroRom_release, [:rom_handle], :void
+  attach_function :nitroRom_load, [:rom_handle, :string], :bool
+  attach_function :nitroRom_getSize, [:rom_handle], :size_t
+  attach_function :nitroRom_getHeader, [:rom_handle], :header_handle
+  attach_function :nitroRom_getFile, [:rom_handle, :uint32], :pointer
+  attach_function :nitroRom_getFileSize, [:rom_handle, :uint32], :uint32
+  attach_function :nitroRom_loadArm9, [:rom_handle], :codebin_handle
+  attach_function :nitroRom_loadArm7, [:rom_handle], :codebin_handle
+  attach_function :nitroRom_loadOverlay, [:rom_handle, :uint32], :codebin_handle
+  attach_function :nitroRom_getOverlayCount, [:rom_handle], :uint32
 
-  attach_function :codeBin_read64, [:pointer, :uint32], :uint64
-  attach_function :codeBin_read32, [:pointer, :uint32], :uint32
-  attach_function :codeBin_read16, [:pointer, :uint32], :uint16
-  attach_function :codeBin_read8, [:pointer, :uint32], :uint8
-  attach_function :codeBin_getSize, [:pointer], :uint32
-  attach_function :codeBin_getStartAddress, [:pointer], :uint32
+  attach_function :headerBin_alloc, [], :header_handle
+  attach_function :headerBin_release, [:header_handle], :void
+  attach_function :headerBin_load, [:header_handle, :string], :bool
+  attach_function :headerBin_getGameTitle, [:header_handle], :string
+  attach_function :headerBin_getGameCode, [:header_handle], :string
+  attach_function :headerBin_getMakerCode, [:header_handle], :string
+  attach_function :headerBin_getArm9AutoLoadHookOffset, [:header_handle], :uint32
+  attach_function :headerBin_getArm7AutoLoadHookOffset, [:header_handle], :uint32
+  attach_function :headerBin_getArm9EntryAddress, [:header_handle], :uint32
+  attach_function :headerBin_getArm7EntryAddress, [:header_handle], :uint32
+  attach_function :headerBin_getArm9RamAddress, [:header_handle], :uint32
+  attach_function :headerBin_getArm7RamAddress, [:header_handle], :uint32
 
-  attach_function :armBin_alloc, [], :pointer
-  attach_function :armBin_release, [:pointer], :void
-  attach_function :armBin_load, [:pointer, :string, :uint32, :uint32, :uint32, :bool], :bool
-  attach_function :armBin_getEntryPointAddress, [:pointer], :uint32
+  attach_function :codeBin_read64, [:codebin_handle, :uint32], :uint64
+  attach_function :codeBin_read32, [:codebin_handle, :uint32], :uint32
+  attach_function :codeBin_read16, [:codebin_handle, :uint32], :uint16
+  attach_function :codeBin_read8, [:codebin_handle, :uint32], :uint8
+  attach_function :codeBin_getSize, [:codebin_handle], :uint32
+  attach_function :codeBin_getStartAddress, [:codebin_handle], :uint32
 
-  attach_function :overlayBin_alloc, [], :pointer
-  attach_function :overlayBin_release, [:pointer], :void
-  attach_function :overlayBin_load, [:pointer, :string, :uint32, :bool, :int32], :bool
+  attach_function :armBin_alloc, [], :codebin_handle
+  attach_function :armBin_release, [:codebin_handle], :void
+  attach_function :armBin_load, [:codebin_handle, :string, :uint32, :uint32, :uint32, :bool], :bool
+  attach_function :armBin_getEntryPointAddress, [:codebin_handle], :uint32
+
+  attach_function :overlayBin_alloc, [], :codebin_handle
+  attach_function :overlayBin_release, [:codebin_handle], :void
+  attach_function :overlayBin_load, [:codebin_handle, :string, :uint32, :bool, :int32], :bool
 
 end
 
@@ -57,8 +61,64 @@ module UnarmBind
   extend FFI::Library
   ffi_lib ['unarm', Dir.pwd + '/unarm']
 
-  attach_function :disasm_arm_ins, [:uint32], :string
-  attach_function :free_c_str, [:string], :void
+  typedef :pointer, :ins_handle
+
+  attach_function :arm9_new_arm_ins, [:uint32], :ins_handle
+  attach_function :arm9_new_thumb_ins, [:uint32], :ins_handle
+  attach_function :arm7_new_arm_ins, [:uint32], :ins_handle
+  attach_function :arm7_new_thumb_ins, [:uint32], :ins_handle
+  
+  attach_function :arm9_arm_ins_to_str, [:ins_handle], :pointer
+  attach_function :arm7_arm_ins_to_str, [:ins_handle], :pointer
+  attach_function :arm9_thumb_ins_to_str, [:ins_handle], :pointer
+  attach_function :arm7_thumb_ins_to_str, [:ins_handle], :pointer
+
+  attach_function :arm9_arm_get_opcode_id, [:ins_handle], :uint16
+  attach_function :arm7_arm_get_opcode_id, [:ins_handle], :uint16
+  attach_function :arm9_thumb_get_opcode_id, [:ins_handle], :uint16
+  attach_function :arm7_thumb_get_opcode_id, [:ins_handle], :uint16
+
+  attach_function :arm9_arm_ins_is_conditional, [:ins_handle], :bool
+  attach_function :arm7_arm_ins_is_conditional, [:ins_handle], :bool
+  attach_function :arm9_thumb_ins_is_conditional, [:ins_handle], :bool
+  attach_function :arm7_thumb_ins_is_conditional, [:ins_handle], :bool
+
+  attach_function :free_arm_ins, [:ins_handle], :void
+  attach_function :free_thumb_ins, [:ins_handle], :void
+  attach_function :free_c_str, [:pointer], :void
+
+  OPCODE = [
+    :illegal, :adc, :add, :and, :asr, :b, :bl, :bic, :bkpt, :blx, :blx, :bx,
+    :bxj, :cdp, :cdp2, :clrex, :clz, :cmn, :cmp, :cps, :csdb, :dbg, :eor,
+    :ldc, :ldc2, :ldm, :ldm, :ldm, :ldm, :ldm, :ldm, :ldr, :ldrb, :ldrbt,
+    :ldrd, :ldrex, :ldrexb, :ldrexd, :ldrexh, :ldrh, :ldrsb, :ldrsh, :ldrt,
+    :lsl, :lsr, :mcr, :mcr2, :mcrr, :mcrr2, :mla, :mov, :mov, :mov, :mrc,
+    :mrc2, :mrrc, :mrrc2, :mrs, :msr, :msr, :mul, :mvn, :nop, :orr, :pkhbt,
+    :pkhtb, :pld, :pop, :pop, :push, :push, :qadd, :qadd16, :qadd8, :qasx, :qdadd,
+    :qdsub, :qsax, :qsub, :qsub16, :qsub8, :rev, :rev16, :revsh, :rfe, :ror, :rrx,
+    :rsb, :rsc, :sadd16, :sadd8, :sasx, :sbc, :sel, :setend, :sev, :shadd16, :shadd8,
+    :shasx, :shsax, :shsub16, :shsub8, :smla, :smlad, :smlal, :smlal, :smlald, :smlaw,
+    :smlsd, :smlsld, :smmla, :smmls, :smmul, :smuad, :smul, :smull, :smulw, :smusd, :srs,
+    :ssat, :ssat16, :ssax, :ssub16, :ssub8, :stc, :stc2, :stm, :stm, :stm, :stm,
+    :str, :strb, :strbt, :strd, :strex, :strexb, :strexd, :strexh, :strh, :strt, :sub,
+    :svc, :swi, :swp, :swpb, :sxtab, :sxtab16, :sxtah, :sxtb, :sxtb16, :sxth, :teq,
+    :tst, :uadd16, :uadd8, :uasx, :udf, :uhadd16, :uhadd8, :uhasx, :uhsax, :uhsub16, :uhsub8,
+    :umaal, :umlal, :umull, :uqadd16, :uqadd8, :uqasx, :uqsax, :uqsub16, :uqsub8, :usad8, 
+    :usada8, :usat, :usat16, :usax, :usub16, :usub8, :uxtab, :uxtab16, :uxtah, :uxtb, :uxtb16,
+    :uxth, :wfe, :wfi, :yield
+  ].freeze
+
+  CONDITION = [
+    :illegal, :eq, :ne, :hs, :lo, :mi, :pl, :vs, :vc, :hi, :ls, :ge, :lt, :gt, :le, :al
+  ].freeze
+
+  REGISTER = [
+    :r0, :r1, :r2, :r3, :r4, :r5, :r6, :r7, :r8, :r9, :r10, :r11, :r12, :sp, :lr, :pc
+  ].freeze
+
+  SHIFT = [
+    :lsl, :lsr, :asr, :ror, :rrx
+  ].freeze
 
 end
 
@@ -278,17 +338,66 @@ private
 
 end
 
+
 module Unarm
   extend UnarmBind
 
-  class Ins
+  module CPU
+    ARM9 = :arm9 # ARMv5Te
+    ARM7 = :arm7 # ARMv4T
+  end
 
+  @cpu = CPU::ARM9
+
+  def self.cpu
+    @cpu
+  end
+
+  def self.use_arm9
+    @cpu = CPU::ARM9
+  end
+
+  def self.use_arm7
+    @cpu = CPU::ARM7
+  end
+
+  class CStr < FFI::AutoPointer
+    def self.release(ptr)
+      UnarmBind.free_c_str(ptr)
+    end
+
+    def to_s
+      self.read_string
+    end
+
+  end
+
+  class Ins
     class << self
       alias_method :disasm, :new
     end
 
-    attr_reader :str, :raw
-    alias_method :string, :str
+    attr_reader :raw, :op_id
+
+    alias_method :opcode_id, :op_id
+
+    def string
+      @str.to_s
+    end
+    alias_method :str, :string
+
+    def opcode_mnemonic
+      UnarmBind::OPCODE[@op_id].to_s
+    end
+    alias_method :opcode_string, :opcode_mnemonic
+    alias_method :opcode_str, :opcode_mnemonic
+    alias_method :op_string, :opcode_mnemonic
+    alias_method :op_str, :opcode_mnemonic
+
+    def is_conditional?
+      @conditional
+    end
+    alias_method :conditional?, :is_conditional?
 
   end
 
@@ -297,7 +406,10 @@ module Unarm
 
     def initialize(ins)
       @raw = ins
-      @str = disasm_arm_ins(ins)
+      @ptr = FFI::AutoPointer.new(eval("#{Unarm.cpu.to_s}_new_arm_ins(ins)"), UnarmBind.method(:free_arm_ins))
+      @str = CStr.new(eval("#{Unarm.cpu.to_s}_arm_ins_to_str(@ptr)"))
+      @op_id = eval("#{Unarm.cpu.to_s}_arm_get_opcode_id(@ptr)")
+      @conditional = eval("#{Unarm.cpu.to_s}_arm_ins_is_conditional(@ptr)")
     end
 
   end
@@ -307,9 +419,17 @@ module Unarm
 
     def initialize(ins)
       @raw = ins
-      # TODO
+      @ptr = FFI::AutoPointer.new(eval("#{Unarm.cpu.to_s}_new_thumb_ins(ins)"), UnarmBind.method(:free_thumb_ins))
+      @str = CStr.new(eval("#{Unarm.cpu.to_s}_thumb_ins_to_str(@ptr)"))
+      @op_id = eval("#{Unarm.cpu.to_s}_thumb_get_opcode_id(@ptr)")
+      @conditional = eval("#{Unarm.cpu.to_s}_thumb_ins_is_conditional(@ptr)")
     end
 
+  end
+
+  class Parser
+    include UnarmBind
+    # TODO
   end
 
 end
@@ -324,6 +444,21 @@ if $PROGRAM_NAME == __FILE__
   puts "Arm9 at #{rom.arm9.start_addr.to_hex}: " + rom.arm9.read32(rom.arm9.start_addr).to_hex
   puts "Overlay count: #{rom.overlay_count}"
   puts "Ov0 at #{rom.ov0.start_addr.to_hex}: " + rom.overlay0.read32(rom.overlay0.start_addr).to_hex
+  puts "Ov0 at 0x020773c8: " + Unarm::ThumbIns.disasm(rom.ov0.read16(0x020773c8)).str
 
-  puts "Ov10 at #{rom.ov10.start_addr.to_hex}: " + Unarm::ArmIns.new(rom.ov10.read32(rom.ov10.start_addr)).string
+  start_addr = rom.ov54.start_addr
+  illegal_found = false
+  i = 0
+  until illegal_found or start_addr+i*4 > rom.ov54.end_addr do
+    ins = Unarm::ArmIns.disasm(rom.ov54.read32(start_addr+i*4))
+    illegal_found = ins.op_id == 0
+    i += 1
+  end
+
+  if illegal_found
+    puts "Illegal instruction found at #{(start_addr+i*4).to_hex}!"
+  else
+    puts "Illegal instruction not found!!"
+  end
+
 end

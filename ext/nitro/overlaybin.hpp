@@ -43,6 +43,8 @@ public:
 	[[nodiscard]] constexpr bool getDirty() const { return m_isDirty; }
 	constexpr void setDirty(bool isDirty) { m_isDirty = isDirty; }
 
+	s32 getID() const { return m_id; }
+
 private:
 	std::vector<u8> m_bytes;
 	u32 m_ramAddress;
