@@ -6,4 +6,5 @@ ext/unarm/target/
 *.dll
 *.so
 *.ps1
+*.txt
 .DS_Store

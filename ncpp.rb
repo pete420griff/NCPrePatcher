@@ -13,6 +13,7 @@ module NitroBind
   typedef :pointer, :rom_handle
   typedef :pointer, :header_handle
   typedef :pointer, :codebin_handle
+  typedef :pointer, :ovte_handle
 
   attach_function :nitroRom_alloc, [], :rom_handle
   attach_function :nitroRom_release, [:rom_handle], :void
@@ -25,6 +26,7 @@ module NitroBind
   attach_function :nitroRom_loadArm7, [:rom_handle], :codebin_handle
   attach_function :nitroRom_loadOverlay, [:rom_handle, :uint32], :codebin_handle
   attach_function :nitroRom_getOverlayCount, [:rom_handle], :uint32
+  attach_function :nitroRom_getArm9OvT, [:rom_handle], :ovte_handle
 
   attach_function :headerBin_alloc, [], :header_handle
   attach_function :headerBin_release, [:header_handle], :void
@@ -38,6 +40,7 @@ module NitroBind
   attach_function :headerBin_getArm7EntryAddress, [:header_handle], :uint32
   attach_function :headerBin_getArm9RamAddress, [:header_handle], :uint32
   attach_function :headerBin_getArm7RamAddress, [:header_handle], :uint32
+  attach_function :headerBin_getArm9OvTSize, [:header_handle], :uint32
 
   attach_function :codeBin_read64, [:codebin_handle, :uint32], :uint64
   attach_function :codeBin_read32, [:codebin_handle, :uint32], :uint32
@@ -62,31 +65,40 @@ module UnarmBind
   ffi_lib ['unarm', Dir.pwd + '/unarm']
 
   typedef :pointer, :ins_handle
+  typedef :pointer, :cstr_handle
+  typedef :pointer, :parser_handle
 
   attach_function :arm9_new_arm_ins, [:uint32], :ins_handle
   attach_function :arm9_new_thumb_ins, [:uint32], :ins_handle
   attach_function :arm7_new_arm_ins, [:uint32], :ins_handle
   attach_function :arm7_new_thumb_ins, [:uint32], :ins_handle
+
+  attach_function :arm9_new_parser, [:uint32], :parser_handle
+  attach_function :arm7_new_parser, [:uint32], :parser_handle
   
-  attach_function :arm9_arm_ins_to_str, [:ins_handle], :pointer
-  attach_function :arm7_arm_ins_to_str, [:ins_handle], :pointer
-  attach_function :arm9_thumb_ins_to_str, [:ins_handle], :pointer
-  attach_function :arm7_thumb_ins_to_str, [:ins_handle], :pointer
+  attach_function :arm9_arm_ins_to_str, [:ins_handle], :cstr_handle
+  attach_function :arm7_arm_ins_to_str, [:ins_handle], :cstr_handle
+  attach_function :arm9_thumb_ins_to_str, [:ins_handle], :cstr_handle
+  attach_function :arm7_thumb_ins_to_str, [:ins_handle], :cstr_handle
 
   attach_function :arm9_arm_get_opcode_id, [:ins_handle], :uint16
   attach_function :arm7_arm_get_opcode_id, [:ins_handle], :uint16
   attach_function :arm9_thumb_get_opcode_id, [:ins_handle], :uint16
   attach_function :arm7_thumb_get_opcode_id, [:ins_handle], :uint16
 
-  attach_function :arm9_arm_ins_is_conditional, [:ins_handle], :bool
-  attach_function :arm7_arm_ins_is_conditional, [:ins_handle], :bool
-  attach_function :arm9_thumb_ins_is_conditional, [:ins_handle], :bool
-  attach_function :arm7_thumb_ins_is_conditional, [:ins_handle], :bool
+  attach_function :arm_ins_is_conditional, [:ins_handle], :bool
+  attach_function :thumb_ins_is_conditional, [:ins_handle], :bool
+
+  attach_function :arm_ins_updates_condition_flags, [:ins_handle], :bool
+  attach_function :thumb_ins_updates_condition_flags, [:ins_handle], :bool
 
   attach_function :free_arm_ins, [:ins_handle], :void
   attach_function :free_thumb_ins, [:ins_handle], :void
-  attach_function :free_c_str, [:pointer], :void
+  attach_function :arm9_free_parser, [:parser_handle], :void
+  attach_function :arm7_free_parser, [:parser_handle], :void
+  attach_function :free_c_str, [:cstr_handle], :void
 
+  # NOTE: some instructions here are not valid in ARMv5TE or v4T
   OPCODE = [
     :illegal, :adc, :add, :and, :asr, :b, :bl, :bic, :bkpt, :blx, :blx, :bx,
     :bxj, :cdp, :cdp2, :clrex, :clz, :cmn, :cmp, :cps, :csdb, :dbg, :eor,
@@ -125,23 +137,76 @@ end
 module Nitro
   extend NitroBind
 
+  class OvtEntry < FFI::Struct
+    layout :overlay_id,   :uint32,
+           :ram_address,  :uint32,
+           :ram_size,     :uint32,
+           :bss_size,     :uint32,
+           :sinit_start,  :uint32,
+           :sinit_end,    :uint32,
+           :file_id,      :uint32,
+           :comp_field,   :uint32
+
+    def ram_addr
+      self[:ram_address]
+    end
+
+    def compressed_size
+      (self[:comp_field] >> 8) & 0xffffff # 24 bits
+    end
+
+    def is_compressed?
+      (self[:comp_field] & 0xff) == 1   # 8 bits
+    end
+    alias_method :compressed?, :is_compressed?
+
+  end
+
+  class OvtBin
+    include NitroBind
+
+    attr_reader :size, :entry_count
+
+    def initialize(args = {})
+      if args.has_key? :file_path
+        bin = File.binread(args[:file_path])
+        @size = bin.bytesize
+        @ptr = FFI::MemoryPointer.new(:uint8, @size)
+        @ptr.put_bytes(0, bin)
+
+      elsif args.has_key? :ptr and args.has_key? :size
+        @ptr = args[:ptr]
+        @size = args[:size]
+        @entry_count = @size / OvtEntry.size
+      else
+        raise ArgumentError
+      end
+    end
+
+    def get_entry(id)
+      raise IndexError if id > @entry_count-1
+      OvtEntry.new(@ptr + id*OvtEntry.size)
+    end
+
+  end
+
   class CodeBin
     include NitroBind
 
-    def read64(address)
-      codeBin_read64(@ptr, address)
+    def read64(addr)
+      codeBin_read64(@ptr, addr)
     end
 
-    def read32(address)
-      codeBin_read32(@ptr, address)
+    def read32(addr)
+      codeBin_read32(@ptr, addr)
     end
 
-    def read16(address)
-      codeBin_read16(@ptr, address)
+    def read16(addr)
+      codeBin_read16(@ptr, addr)
     end
 
-    def read8(address)
-      codeBin_read8(@ptr, address)
+    def read8(addr)
+      codeBin_read8(@ptr, addr)
     end
 
     def size
@@ -271,6 +336,10 @@ module Nitro
     end
     alias_method :arm7_ram_addr, :arm7_ram_address
 
+    def get_arm9_ovt_size
+      headerBin_getArm9OvTSize(@ptr)
+    end
+
   end
 
   class Rom
@@ -280,7 +349,11 @@ module Nitro
       alias_method :load, :new
     end
 
-    attr_reader :header, :arm9, :arm7, :overlays, :overlay_count
+    attr_reader :header, :arm9, :arm7, :overlays, :overlay_count, :overlay_table
+
+    alias_method :ov_count, :overlay_count
+    alias_method :ov_table, :overlay_table
+    alias_method :ovt, :overlay_table
 
     def initialize(file_path)
       @ptr = FFI::AutoPointer.new(nitroRom_alloc, NitroBind.method(:nitroRom_release))
@@ -294,6 +367,7 @@ module Nitro
       @arm7 = ArmBin.new(ptr: FFI::AutoPointer.new(nitroRom_loadArm7(@ptr), NitroBind.method(:armBin_release)))
       @overlay_count = nitroRom_getOverlayCount(@ptr)
       @overlays = Array.new(@overlay_count)
+      @overlay_table = OvtBin.new(ptr: nitroRom_getArm9OvT(@ptr), size: @header.get_arm9_ovt_size)
       define_ov_accessors
     end
 
@@ -393,11 +467,17 @@ module Unarm
     alias_method :opcode_str, :opcode_mnemonic
     alias_method :op_string, :opcode_mnemonic
     alias_method :op_str, :opcode_mnemonic
+    alias_method :op_mnemonic, :opcode_mnemonic
 
     def is_conditional?
       @conditional
     end
     alias_method :conditional?, :is_conditional?
+
+    def sets_flags?
+      @sets_flags
+    end
+    alias_method :updates_condition_flags?, :sets_flags?
 
   end
 
@@ -409,7 +489,8 @@ module Unarm
       @ptr = FFI::AutoPointer.new(eval("#{Unarm.cpu.to_s}_new_arm_ins(ins)"), UnarmBind.method(:free_arm_ins))
       @str = CStr.new(eval("#{Unarm.cpu.to_s}_arm_ins_to_str(@ptr)"))
       @op_id = eval("#{Unarm.cpu.to_s}_arm_get_opcode_id(@ptr)")
-      @conditional = eval("#{Unarm.cpu.to_s}_arm_ins_is_conditional(@ptr)")
+      @conditional = arm_ins_is_conditional(@ptr)
+      @sets_flags = arm_ins_updates_condition_flags(@ptr)
     end
 
   end
@@ -422,7 +503,8 @@ module Unarm
       @ptr = FFI::AutoPointer.new(eval("#{Unarm.cpu.to_s}_new_thumb_ins(ins)"), UnarmBind.method(:free_thumb_ins))
       @str = CStr.new(eval("#{Unarm.cpu.to_s}_thumb_ins_to_str(@ptr)"))
       @op_id = eval("#{Unarm.cpu.to_s}_thumb_get_opcode_id(@ptr)")
-      @conditional = eval("#{Unarm.cpu.to_s}_thumb_ins_is_conditional(@ptr)")
+      @conditional = thumb_ins_is_conditional(@ptr)
+      @sets_flags = thumb_ins_updates_condition_flags(@ptr)
     end
 
   end
@@ -430,6 +512,11 @@ module Unarm
   class Parser
     include UnarmBind
     # TODO
+    module Mode
+      ARM = 0
+      THUMB = 1
+      DATA = 2
+    end
   end
 
 end
@@ -441,24 +528,29 @@ if $PROGRAM_NAME == __FILE__
   puts "Game code: #{rom.header.game_code}"
   puts "Maker code: #{rom.header.maker_code}"
   puts "Size: #{(rom.size / 1024.0 / 1024.0).round(2)} MB"
-  puts "Arm9 at #{rom.arm9.start_addr.to_hex}: " + rom.arm9.read32(rom.arm9.start_addr).to_hex
   puts "Overlay count: #{rom.overlay_count}"
-  puts "Ov0 at #{rom.ov0.start_addr.to_hex}: " + rom.overlay0.read32(rom.overlay0.start_addr).to_hex
-  puts "Ov0 at 0x020773c8: " + Unarm::ThumbIns.disasm(rom.ov0.read16(0x020773c8)).str
 
-  start_addr = rom.ov54.start_addr
-  illegal_found = false
-  i = 0
-  until illegal_found or start_addr+i*4 > rom.ov54.end_addr do
-    ins = Unarm::ArmIns.disasm(rom.ov54.read32(start_addr+i*4))
-    illegal_found = ins.op_id == 0
-    i += 1
-  end
+  # ovte = Nitro::OvtBin.new('arm9ovt.bin').get_entry(1)
 
-  if illegal_found
-    puts "Illegal instruction found at #{(start_addr+i*4).to_hex}!"
-  else
-    puts "Illegal instruction not found!!"
+  # puts ovte[:ram_address].to_hex
+  # puts ovte.is_compressed?
+
+  # ov1 = Nitro::OverlayBin.new(
+  #   1, file_path: 'overlay9_1.bin', ram_addr: ovte[:ram_address], is_compressed: ovte.compressed?
+  # )
+
+  start_addr = rom.ov1.start_addr
+  end_addr = rom.ov1.end_addr
+  pc = start_addr
+  puts 'Disassembling ov1...'
+  f = File.new('ov1-disasm2.txt', 'w')
+  until pc == end_addr do
+    f.write("#{pc.to_hex}: ")
+    f.puts(Unarm::ArmIns.disasm(rom.ov1.read32(pc)).str)
+    pc += 4
   end
+  f.close
+
+  puts 'Done!'
 
 end

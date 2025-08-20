@@ -66,6 +66,10 @@ extern "C" {
 		return ov;
 	}
 
+	DLL_EXPORT const OvtEntry* nitroRom_getArm9OvT(const NitroRom* rom) {
+		return reinterpret_cast<const OvtEntry*>(&rom->data()[rom->getHeader().arm9OvT.romOffset]);
+	}
+
 	DLL_EXPORT u32 nitroRom_getOverlayCount(const NitroRom* rom) {
 		return rom->getOverlayCount();
 	}
@@ -133,6 +137,10 @@ extern "C" {
 
 	DLL_EXPORT u32 headerBin_getArm7RamAddress(const HeaderBin* header) {
 		return header->arm7.ramAddress;
+	}
+
+	DLL_EXPORT u32 headerBin_getArm9OvTSize(const HeaderBin* header) {
+		return header->arm9OvT.size;
 	}
 
 
