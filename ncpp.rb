@@ -6,9 +6,15 @@ class Integer
   end
 end
 
+class String
+  def from_hex
+    Integer(self,16)
+  end
+end
+
 module NitroBind
   extend FFI::Library
-  ffi_lib ['nitro', Dir.pwd + '/nitro']
+  ffi_lib [Dir.pwd + '/nitro']
 
   typedef :pointer, :rom_handle
   typedef :pointer, :header_handle
@@ -62,7 +68,7 @@ end
 
 module UnarmBind
   extend FFI::Library
-  ffi_lib ['unarm', Dir.pwd + '/unarm']
+  ffi_lib [Dir.pwd + '/unarm']
 
   typedef :pointer, :ins_handle
   typedef :pointer, :cstr_handle
@@ -98,7 +104,7 @@ module UnarmBind
   attach_function :arm7_free_parser, [:parser_handle], :void
   attach_function :free_c_str, [:cstr_handle], :void
 
-  # NOTE: some instructions here are not valid in ARMv5TE or v4T
+  # NOTE: some of the following instructions are not valid in ARMv5TE or v4T
   OPCODE = [
     :illegal, :adc, :add, :and, :asr, :b, :bl, :bic, :bkpt, :blx, :blx, :bx,
     :bxj, :cdp, :cdp2, :clrex, :clz, :cmn, :cmp, :cps, :csdb, :dbg, :eor,
@@ -230,7 +236,7 @@ module Nitro
 
     def initialize(args = {})
       if args.has_key? :file_path
-        @ptr = FFI::AutoPointer.new(armBin_alloc, NitroBind.method(:armBin_release))
+        @ptr = FFI::AutoPointer.new(armBin_alloc, method(:armBin_release))
         if not File.exist? args[:file_path]
           puts "Error: #{args[:file_path]} does not exist"
           raise "ArmBin initialization failed"
@@ -260,8 +266,8 @@ module Nitro
 
     def initialize(id, args = {})
       @id = id
-      if args.has_key? :file_path
-        @ptr = FFI::AutoPointer.new(overlayBin_alloc, NitroBind.method(:overlayBin_release))
+      if [:file_path, :ram_addr, :is_compressed].all? { |k| args.key?(k) }
+        @ptr = FFI::AutoPointer.new(overlayBin_alloc, method(:overlayBin_release))
         if not File.exist? args[:file_path]
           puts "Error: #{args[:file_path]} does not exist"
           raise "OverlayBin initialization failed"
@@ -283,7 +289,7 @@ module Nitro
 
     def initialize(arg)
       if arg.is_a? String
-        @ptr = FFI::AutoPointer.new(headerBin_alloc, NitroBind.method(:headerBin_release))
+        @ptr = FFI::AutoPointer.new(headerBin_alloc, method(:headerBin_release))
         if not File.exist? arg
           puts "Error: #{arg} does not exist"
           raise "HeaderBin initialization failed"
@@ -356,15 +362,15 @@ module Nitro
     alias_method :ovt, :overlay_table
 
     def initialize(file_path)
-      @ptr = FFI::AutoPointer.new(nitroRom_alloc, NitroBind.method(:nitroRom_release))
+      @ptr = FFI::AutoPointer.new(nitroRom_alloc, method(:nitroRom_release))
       if not File.exist? file_path
         puts "Error: #{file_path} does not exist"
         raise "Rom initialization failed"
       end
       nitroRom_load(@ptr, file_path)
       @header = HeaderBin.new(nitroRom_getHeader(@ptr))
-      @arm9 = ArmBin.new(ptr: FFI::AutoPointer.new(nitroRom_loadArm9(@ptr), NitroBind.method(:armBin_release)))
-      @arm7 = ArmBin.new(ptr: FFI::AutoPointer.new(nitroRom_loadArm7(@ptr), NitroBind.method(:armBin_release)))
+      @arm9 = ArmBin.new(ptr: FFI::AutoPointer.new(nitroRom_loadArm9(@ptr), method(:armBin_release)))
+      @arm7 = ArmBin.new(ptr: FFI::AutoPointer.new(nitroRom_loadArm7(@ptr), method(:armBin_release)))
       @overlay_count = nitroRom_getOverlayCount(@ptr)
       @overlays = Array.new(@overlay_count)
       @overlay_table = OvtBin.new(ptr: nitroRom_getArm9OvT(@ptr), size: @header.get_arm9_ovt_size)
@@ -385,7 +391,7 @@ module Nitro
 
     def load_overlay(id)
       raise IndexError if id > @overlay_count-1
-      @overlays[id] = OverlayBin.new(id, ptr: FFI::AutoPointer.new(nitroRom_loadOverlay(@ptr, id), NitroBind.method(:overlayBin_release)))
+      @overlays[id] = OverlayBin.new(id, ptr: FFI::AutoPointer.new(nitroRom_loadOverlay(@ptr, id), method(:overlayBin_release)))
     end
     alias_method :load_ov, :load_overlay
 
@@ -416,12 +422,24 @@ end
 module Unarm
   extend UnarmBind
 
+  class CStr < FFI::AutoPointer
+    def self.release(ptr)
+      UnarmBind.free_c_str(ptr)
+    end
+
+    def to_s
+      self.read_string
+    end
+
+  end
+
   module CPU
     ARM9 = :arm9 # ARMv5Te
     ARM7 = :arm7 # ARMv4T
   end
 
   @cpu = CPU::ARM9
+  @symbols = nil
 
   def self.cpu
     @cpu
@@ -435,18 +453,52 @@ module Unarm
     @cpu = CPU::ARM7
   end
 
-  class CStr < FFI::AutoPointer
-    def self.release(ptr)
-      UnarmBind.free_c_str(ptr)
+  def self.symbols
+    @symbols
+  end
+
+  class Symbol < FFI::Struct
+    layout :name, :string,
+           :addr, :uint32
+  end
+
+  class Symbols
+
+    attr_reader :syms
+
+    def self.load(file_path)
+      syms = []
+      File.open(file_path) do |f|
+        f.each_line do |line|
+          parts = line.split
+          next if line.length < 4 || line.start_with?('/') || parts.length < 3
+
+          parts.delete_at(1) # removes '='
+          parts = parts[0..1]    # keep symbol and name
+
+          parts[1] = parts[1].chomp(';') if parts[1].end_with?(';')
+
+          begin
+            parts[1] = parts[1].from_hex
+            syms << parts
+          rescue
+            # ignore if address cannot be converted to hex
+          end
+
+        end
+      end
+      syms.to_h
     end
 
-    def to_s
-      self.read_string
+    def initialize(file_path)
+      @syms = load(file_path)
     end
 
   end
 
   class Ins
+    include UnarmBind
+
     class << self
       alias_method :disasm, :new
     end
@@ -482,11 +534,10 @@ module Unarm
   end
 
   class ArmIns < Ins
-    include UnarmBind
 
     def initialize(ins)
       @raw = ins
-      @ptr = FFI::AutoPointer.new(eval("#{Unarm.cpu.to_s}_new_arm_ins(ins)"), UnarmBind.method(:free_arm_ins))
+      @ptr = FFI::AutoPointer.new(eval("#{Unarm.cpu.to_s}_new_arm_ins(ins)"), method(:free_arm_ins))
       @str = CStr.new(eval("#{Unarm.cpu.to_s}_arm_ins_to_str(@ptr)"))
       @op_id = eval("#{Unarm.cpu.to_s}_arm_get_opcode_id(@ptr)")
       @conditional = arm_ins_is_conditional(@ptr)
@@ -496,11 +547,10 @@ module Unarm
   end
 
   class ThumbIns < Ins
-    include UnarmBind
 
     def initialize(ins)
       @raw = ins
-      @ptr = FFI::AutoPointer.new(eval("#{Unarm.cpu.to_s}_new_thumb_ins(ins)"), UnarmBind.method(:free_thumb_ins))
+      @ptr = FFI::AutoPointer.new(eval("#{Unarm.cpu.to_s}_new_thumb_ins(ins)"), method(:free_thumb_ins))
       @str = CStr.new(eval("#{Unarm.cpu.to_s}_thumb_ins_to_str(@ptr)"))
       @op_id = eval("#{Unarm.cpu.to_s}_thumb_get_opcode_id(@ptr)")
       @conditional = thumb_ins_is_conditional(@ptr)
@@ -552,5 +602,7 @@ if $PROGRAM_NAME == __FILE__
   f.close
 
   puts 'Done!'
+
+  # puts 'Loading symbols9...'
 
 end
