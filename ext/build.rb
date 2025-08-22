@@ -30,10 +30,10 @@ LIB_EXT = case
           end
 
 NITRO_BUILD_PATH = 'nitro/build/'
-NITRO_LIB_NAME = 'nitro' + LIB_EXT
+NITRO_LIB_NAME = (OS.mac? ? 'libnitro' : 'nitro') + LIB_EXT
 
 UNARM_BUILD_PATH = 'unarm/'
-UNARM_LIB_NAME = 'unarm_c' + LIB_EXT
+UNARM_LIB_NAME = (OS.mac? ? 'libunarm_c' : 'unarm_c') + LIB_EXT
 
 def config_nitro
   # Create build folder if it doesn't exist
@@ -61,7 +61,7 @@ def build_nitro
   end
   # Move lib to main dir
   lib_path = NITRO_BUILD_PATH + (OS.windows? ? 'Release/' : '') + NITRO_LIB_NAME
-  lib_dest = '../' + NITRO_LIB_NAME
+  lib_dest = '../nitro' + LIB_EXT
   puts "Moving #{lib_path} to #{lib_dest}"
   begin
     FileUtils.move lib_path, lib_dest

@@ -14,7 +14,7 @@ end
 
 module NitroBind
   extend FFI::Library
-  ffi_lib [Dir.pwd + '/nitro']
+  ffi_lib [Dir.pwd + '/nitro', 'nitro.dylib', 'nitro.so']
 
   typedef :pointer, :rom_handle
   typedef :pointer, :header_handle
@@ -68,7 +68,7 @@ end
 
 module UnarmBind
   extend FFI::Library
-  ffi_lib [Dir.pwd + '/unarm']
+  ffi_lib [Dir.pwd + '/unarm', 'unarm.dylib', 'unarm.so']
 
   typedef :pointer, :ins_handle
   typedef :pointer, :cstr_handle
