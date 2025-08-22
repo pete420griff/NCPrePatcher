@@ -1,10 +1,14 @@
+# Exclude build directories
 ext/nitro/build/
 ext/unarm/target/
-*.nds
-*.bin
-*.dylib
-*.dll
-*.so
-*.ps1
-*.txt
-.DS_Store
+
+# Exclude all files from root directory
+/*
+/*/
+
+# Include only these file from root directory
+!ncpp.rb
+!Gemfile
+!Gemfile.lock
+!README.md
+!.gitignore
