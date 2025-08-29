@@ -14,7 +14,7 @@ end
 
 module NitroBind
   extend FFI::Library
-  ffi_lib [Dir.pwd + '/nitro']
+  ffi_lib [Dir.pwd + '/nitro', 'nitro.dylib', 'nitro.so']
 
   typedef :pointer, :rom_handle
   typedef :pointer, :header_handle
@@ -68,11 +68,12 @@ end
 
 module UnarmBind
   extend FFI::Library
-  ffi_lib [Dir.pwd + '/unarm']
+  ffi_lib [Dir.pwd + '/unarm', 'unarm.dylib', 'unarm.so']
 
   typedef :pointer, :ins_handle
   typedef :pointer, :cstr_handle
   typedef :pointer, :parser_handle
+  typedef :pointer, :symbols_handle
 
   attach_function :arm9_new_arm_ins, [:uint32], :ins_handle
   attach_function :arm9_new_thumb_ins, [:uint32], :ins_handle
@@ -86,6 +87,11 @@ module UnarmBind
   attach_function :arm7_arm_ins_to_str, [:ins_handle], :cstr_handle
   attach_function :arm9_thumb_ins_to_str, [:ins_handle], :cstr_handle
   attach_function :arm7_thumb_ins_to_str, [:ins_handle], :cstr_handle
+
+  attach_function :arm9_arm_ins_to_str_with_syms, [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
+  attach_function :arm7_arm_ins_to_str_with_syms, [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
+  attach_function :arm9_thumb_ins_to_str_with_syms, [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
+  attach_function :arm7_thumb_ins_to_str_with_syms, [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
 
   attach_function :arm9_arm_get_opcode_id, [:ins_handle], :uint16
   attach_function :arm7_arm_get_opcode_id, [:ins_handle], :uint16
@@ -104,7 +110,7 @@ module UnarmBind
   attach_function :arm7_free_parser, [:parser_handle], :void
   attach_function :free_c_str, [:cstr_handle], :void
 
-  # NOTE: some of the following instructions are not valid in ARMv5TE or v4T
+  # NOTE: some of the following instructions are not valid in ARMv5TE/v4T
   OPCODE = [
     :illegal, :adc, :add, :and, :asr, :b, :bl, :bic, :bkpt, :blx, :blx, :bx,
     :bxj, :cdp, :cdp2, :clrex, :clz, :cmn, :cmp, :cps, :csdb, :dbg, :eor,
@@ -153,8 +159,20 @@ module Nitro
            :file_id,      :uint32,
            :comp_field,   :uint32
 
+    def id
+      self[:overlay_id]
+    end
+
     def ram_addr
       self[:ram_address]
+    end
+
+    def sinit_bounds
+      self[:sinit_start]..self[:sinit_end]
+    end
+
+    def fid
+      self[:file_id]
     end
 
     def compressed_size
@@ -180,7 +198,7 @@ module Nitro
         @ptr = FFI::MemoryPointer.new(:uint8, @size)
         @ptr.put_bytes(0, bin)
 
-      elsif args.has_key? :ptr and args.has_key? :size
+      elsif args.has_key?(:ptr) && args.has_key?(:size)
         @ptr = args[:ptr]
         @size = args[:size]
         @entry_count = @size / OvtEntry.size
@@ -229,6 +247,19 @@ module Nitro
     end
     alias_method :end_addr, :end_address
 
+    def bounds
+      start_addr..end_addr
+    end
+
+    def read(range = bounds, step = 4)
+      raise ArgumentError, 'step must be 1, 2, or 4 (bytes)' unless [1,2,4].include? step
+      raise ArgumentError, 'range must be a Range' unless range.is_a? Range
+
+      clamped = Range.new([range.begin || start_addr, start_addr].max, [range.end || end_addr, end_addr].min)
+
+      clamped.step(step).map { |addr| [send(:"read#{step * 8}", addr), addr] }
+    end
+
   end
 
   class ArmBin < CodeBin
@@ -239,15 +270,15 @@ module Nitro
         @ptr = FFI::AutoPointer.new(armBin_alloc, method(:armBin_release))
         if not File.exist? args[:file_path]
           puts "Error: #{args[:file_path]} does not exist"
-          raise "ArmBin initialization failed"
+          raise 'ArmBin initialization failed'
         end
         armBin_load(@ptr, args[:file_path], args[:entry_addr], args[:ram_addr], args[:auto_load_hook_offset], args[:is_arm9] || true)
 
-      elsif args.has_key? :ptr and args[:ptr].is_a? FFI::AutoPointer
+      elsif args.has_key?(:ptr) && args[:ptr].is_a?(FFI::AutoPointer)
         @ptr = args[:ptr]
 
       else
-        raise ArgumentError
+        raise ArgumentError, 'ArmBin must be initialized with a file or a pointer'
       end
     end
 
@@ -274,11 +305,11 @@ module Nitro
         end
         overlayBin_load(@ptr, args[:file_path], args[:ram_addr], args[:is_compressed], @id)
 
-      elsif args.has_key? :ptr and args[:ptr].is_a? FFI::AutoPointer
+      elsif args.has_key?(:ptr) && args[:ptr].is_a?(FFI::AutoPointer)
         @ptr = args[:ptr]
 
       else
-        raise ArgumentError
+        raise ArgumentError, 'OverlayBin must be initialized with a file or a pointer'
       end
     end
 
@@ -351,10 +382,6 @@ module Nitro
   class Rom
     include NitroBind
 
-    class << self
-      alias_method :load, :new
-    end
-
     attr_reader :header, :arm9, :arm7, :overlays, :overlay_count, :overlay_table
 
     alias_method :ov_count, :overlay_count
@@ -363,10 +390,13 @@ module Nitro
 
     def initialize(file_path)
       @ptr = FFI::AutoPointer.new(nitroRom_alloc, method(:nitroRom_release))
+
+      # Check whether file exists here because if C++ throws an exception we get a segfault
       if not File.exist? file_path
         puts "Error: #{file_path} does not exist"
         raise "Rom initialization failed"
       end
+
       nitroRom_load(@ptr, file_path)
       @header = HeaderBin.new(nitroRom_getHeader(@ptr))
       @arm9 = ArmBin.new(ptr: FFI::AutoPointer.new(nitroRom_loadArm9(@ptr), method(:armBin_release)))
@@ -391,7 +421,9 @@ module Nitro
 
     def load_overlay(id)
       raise IndexError if id > @overlay_count-1
-      @overlays[id] = OverlayBin.new(id, ptr: FFI::AutoPointer.new(nitroRom_loadOverlay(@ptr, id), method(:overlayBin_release)))
+      ov_ptr = nitroRom_loadOverlay(@ptr, id)
+      raise "Failed to load overlay #{id}." if !ov_ptr
+      @overlays[id] = OverlayBin.new(id, ptr: FFI::AutoPointer.new(ov_ptr, method(:overlayBin_release)))
     end
     alias_method :load_ov, :load_overlay
 
@@ -439,7 +471,9 @@ module Unarm
   end
 
   @cpu = CPU::ARM9
-  @symbols = nil
+  @symbols9 = nil
+  @symbols7 = nil
+  @raw_syms = {}
 
   def self.cpu
     @cpu
@@ -454,46 +488,137 @@ module Unarm
   end
 
   def self.symbols
-    @symbols
+    @cpu == CPU::ARM9 ? @symbols9 : @symbols7
+  end
+
+  def self.raw_syms
+    @raw_syms
   end
 
   class Symbol < FFI::Struct
-    layout :name, :string,
+    layout :name, :pointer,
            :addr, :uint32
   end
 
   class Symbols
-
-    attr_reader :syms
+    attr_reader :map, :locs, :count
 
     def self.load(file_path)
-      syms = []
+      syms = {} # maps symbol names to their addresses
+      locs = {} # maps symbol names to their code locations (e.g. arm9, ov0, ov10)
+      dest = nil # current symbol location
       File.open(file_path) do |f|
         f.each_line do |line|
           parts = line.split
-          next if line.length < 4 || line.start_with?('/') || parts.length < 3
+
+          next if parts.length < 3
+          
+          is_comment = line.strip.start_with?('/')
+          if is_comment
+            new_dest = parts[1].split('_')
+            dest = new_dest[new_dest.length == 1 ? 0 : 1] if new_dest[0].include?('arm')
+            next
+          end
+
+          next if is_comment || (line.length < 4)
 
           parts.delete_at(1) # removes '='
-          parts = parts[0..1]    # keep symbol and name
+          parts = parts[0..1] # keep symbol and name
 
           parts[1] = parts[1].chomp(';') if parts[1].end_with?(';')
 
           begin
-            parts[1] = parts[1].from_hex
-            syms << parts
+            addr = parts[1].from_hex
+            parts[1] = addr - (addr & 1)
+            syms[parts[0]] = parts[1]
+            if dest
+              locs[dest] = Array.new unless locs[dest]
+              locs[dest] << parts[0]
+            end
           rescue
-            # ignore if address cannot be converted to hex
+            # Ignore if address cannot be converted to hex
           end
 
         end
       end
-      syms.to_h
+      return syms, locs
     end
 
-    def initialize(file_path)
-      @syms = load(file_path)
+    def initialize(args = {})
+      if args.has_key? :file_path
+        @map, @locs = Symbols.load(args[:file_path])
+      elsif args.has_key? :syms
+        @map, @locs = args[:syms].map, args[:syms].locs
+      else
+        raise ArgumentError, 'Symbols must be initialized through a file or a hash'
+      end
+
+      if args.has_key? :locs
+        all_syms = @map
+        @map = {}
+        args[:locs].each do |loc|
+          @locs[loc].each { |sym| @map[sym] = all_syms[sym] }
+        end
+      end
+
+      @count = @map.length
     end
 
+  end
+
+  class RawSymbols # symbols that can be passed to Rust
+    attr_reader :ptr, :count
+
+    def initialize(syms)
+      @count = syms.count
+      @ptr = FFI::MemoryPointer.new(Symbol, @count)
+      sym_arr = @count.times.map do |i|
+        Symbol.new(@ptr + i*Symbol.size)
+      end
+      @name_ptrs = [] # keeps memory for symbol names alive (?)
+      syms.map.each_with_index do |(name, addr), i|
+        name_ptr = FFI::MemoryPointer.from_string(name)
+        @name_ptrs << name_ptr
+        sym_arr[i][:name] = name_ptr
+        sym_arr[i][:addr] = addr
+      end
+    end
+
+  end
+
+  def self.load_symbols9(file_path)
+    @symbols9 = Symbols.new(file_path: file_path, no_raw: true)
+  end
+
+  def self.load_symbols7(file_path)
+    @symbols7 = Symbols.new(file_path: file_path, no_raw: true)
+  end
+
+  def self.symbol_map
+    if @cpu == CPU::ARM9
+      raise 'Symbols9 not loaded' if !@symbols9
+      @symbols9.map
+    else
+      raise 'Symbols7 not loaded' if !@symbols7
+      @symbols7.map
+    end
+  end
+
+  def self.get_raw_symbols(loc)
+    syms = loc == 'arm7' ? @symbols7 : @symbols9
+    loc = 'arm9' if !syms.locs.has_key?(loc)
+    locs = %w[arm7 arm9].include?(loc) ? [loc] : ['arm9', loc]
+    @raw_syms[loc] ||= RawSymbols.new(
+      Symbols.new(
+        syms: syms,
+        locs: locs
+      )
+    )
+  end
+
+  class << self
+    alias_method :sym_map, :symbol_map
+    alias_method :get_raw_syms, :get_raw_symbols
   end
 
   class Ins
@@ -503,16 +628,16 @@ module Unarm
       alias_method :disasm, :new
     end
 
-    attr_reader :raw, :op_id
+    attr_reader :raw, :opcode_id
 
-    alias_method :opcode_id, :op_id
+    alias_method :op_id, :opcode_id
 
     def string
       @str.to_s
     end
     alias_method :str, :string
 
-    def opcode_mnemonic
+      def opcode_mnemonic
       UnarmBind::OPCODE[@op_id].to_s
     end
     alias_method :opcode_string, :opcode_mnemonic
@@ -535,11 +660,16 @@ module Unarm
 
   class ArmIns < Ins
 
-    def initialize(ins)
+    def initialize(ins, addr = 0, loc = Unarm.cpu.to_s)
       @raw = ins
-      @ptr = FFI::AutoPointer.new(eval("#{Unarm.cpu.to_s}_new_arm_ins(ins)"), method(:free_arm_ins))
-      @str = CStr.new(eval("#{Unarm.cpu.to_s}_arm_ins_to_str(@ptr)"))
-      @op_id = eval("#{Unarm.cpu.to_s}_arm_get_opcode_id(@ptr)")
+      @ptr = FFI::AutoPointer.new(send(:"#{Unarm.cpu.to_s}_new_arm_ins", ins), method(:free_arm_ins))
+      if Unarm.symbols
+        syms = Unarm.get_raw_syms(loc)
+        @str = CStr.new(send(:"#{Unarm.cpu.to_s}_arm_ins_to_str_with_syms", @ptr, syms.ptr, syms.count, addr, 0))
+      else
+        @str = CStr.new(send(:"#{Unarm.cpu.to_s}_arm_ins_to_str", @ptr))
+      end
+      @op_id = send(:"#{Unarm.cpu.to_s}_arm_get_opcode_id", @ptr)
       @conditional = arm_ins_is_conditional(@ptr)
       @sets_flags = arm_ins_updates_condition_flags(@ptr)
     end
@@ -548,11 +678,16 @@ module Unarm
 
   class ThumbIns < Ins
 
-    def initialize(ins)
+    def initialize(ins, addr = 0, loc = Unarm.cpu.to_s)
       @raw = ins
-      @ptr = FFI::AutoPointer.new(eval("#{Unarm.cpu.to_s}_new_thumb_ins(ins)"), method(:free_thumb_ins))
-      @str = CStr.new(eval("#{Unarm.cpu.to_s}_thumb_ins_to_str(@ptr)"))
-      @op_id = eval("#{Unarm.cpu.to_s}_thumb_get_opcode_id(@ptr)")
+      @ptr = FFI::AutoPointer.new(send(:"#{Unarm.cpu.to_s}_new_thumb_ins", ins), method(:free_thumb_ins))
+      if Unarm.symbols
+        syms = Unarm.get_raw_syms(loc)
+        @str = CStr.new(send(:"#{Unarm.cpu.to_s}_thumb_ins_to_str_with_syms", @ptr, syms.ptr, syms.count, addr, 0))
+      else
+        @str = CStr.new(send(:"#{Unarm.cpu.to_s}_thumb_ins_to_str", @ptr))
+      end
+      @op_id = send(:"#{Unarm.cpu.to_s}_thumb_get_opcode_id", @ptr)
       @conditional = thumb_ins_is_conditional(@ptr)
       @sets_flags = thumb_ins_updates_condition_flags(@ptr)
     end
@@ -561,48 +696,86 @@ module Unarm
 
   class Parser
     include UnarmBind
-    # TODO
+
     module Mode
       ARM = 0
       THUMB = 1
       DATA = 2
     end
+
+    @mode = Mode::ARM
+
+    def self.mode
+      @mode
+    end
+
+    def set_parse_mode(mode)
+      raise ArgumentError, 'mode must be ARM, THUMB, or DATA' unless (Mode::ARM..Mode::Data).include? mode
+      @mode = mode
+    end
+
   end
 
 end
 
 
 if $PROGRAM_NAME == __FILE__
-  rom = Nitro::Rom.load(ARGV.length == 0 ? "NSMB.nds" : ARGV[0])
+  rom = Nitro::Rom.new(ARGV.length == 0 ? "NSMB.nds" : ARGV[0])
   puts "Game title: #{rom.header.game_title}"
   puts "Game code: #{rom.header.game_code}"
   puts "Maker code: #{rom.header.maker_code}"
   puts "Size: #{(rom.size / 1024.0 / 1024.0).round(2)} MB"
   puts "Overlay count: #{rom.overlay_count}"
+  puts
 
-  # ovte = Nitro::OvtBin.new('arm9ovt.bin').get_entry(1)
+  Unarm.load_symbols9('symbols9.x')
+  Unarm.load_symbols7('symbols7.x')
 
-  # puts ovte[:ram_address].to_hex
-  # puts ovte.is_compressed?
+  # ov24_syms = Unarm::Symbols.new(syms: Unarm.symbols, locs: ['ov24'])
 
-  # ov1 = Nitro::OverlayBin.new(
-  #   1, file_path: 'overlay9_1.bin', ram_addr: ovte[:ram_address], is_compressed: ovte.compressed?
-  # )
+  # puts Unarm::ArmIns.disasm(rom.ov10.read32(rom.ov10.start_addr),rom.ov10.start_addr, 'ov10').str
 
-  start_addr = rom.ov1.start_addr
-  end_addr = rom.ov1.end_addr
-  pc = start_addr
-  puts 'Disassembling ov1...'
-  f = File.new('ov1-disasm2.txt', 'w')
-  until pc == end_addr do
-    f.write("#{pc.to_hex}: ")
-    f.puts(Unarm::ArmIns.disasm(rom.ov1.read32(pc)).str)
-    pc += 4
+  # rom.ov10.read(..rom.ov10.start_addr+0x30).each do |word, addr|
+  #   puts Unarm::ArmIns.disasm(word, addr, 'ov10').str
+  # end
+
+  start_time = Time.now
+
+  f = File.new('nsmb-disasm.txt', 'w')
+
+  Unarm.use_arm7
+
+  puts "Disassembling arm7..."
+  f.puts '-- ARM7 --'
+  rom.arm9.read.each do |word, addr|
+    sym = Unarm.sym_map.key(addr)
+    f.puts sym if sym
+    f.puts "#{addr.to_hex}: #{Unarm::ArmIns.disasm(word, addr, 'arm7').str}"
   end
+
+  Unarm.use_arm9
+
+  puts "Disassembling arm9..."
+  f.puts '-- ARM9 --'
+  rom.arm9.read.each do |word, addr|
+    sym = Unarm.sym_map.key(addr)
+    f.puts sym if sym
+    f.puts "#{addr.to_hex}: #{Unarm::ArmIns.disasm(word, addr, 'arm9').str}"
+  end
+
+  rom.overlay_count.times do |i|
+    puts "Disassembling ov#{i}..."
+    f.puts "-- OVERLAY #{i} --"
+    syms = Unarm.symbols.locs["ov#{i}"] ? Unarm::Symbols.new(syms: Unarm.symbols, locs: ["ov#{i}"]) : nil
+    rom.get_overlay(i).read.each do |word, addr|
+      sym = syms ? syms.map.key(addr) : nil
+      f.puts sym if sym
+      f.puts "#{addr.to_hex}: #{Unarm::ArmIns.disasm(word, addr, "ov#{i}").str}"
+    end
+  end
+
   f.close
 
-  puts 'Done!'
-
-  # puts 'Loading symbols9...'
+  puts "Done! Took #{(Time.now - start_time).round(3)} seconds."
 
 end
