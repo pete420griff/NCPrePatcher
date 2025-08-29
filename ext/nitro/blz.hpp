@@ -30,14 +30,14 @@ namespace blz {
 	 * 
 	 * @param data The data to uncompress.
 	 */
-	void uncompressInplace(std::vector<u8>& data);
+	bool uncompressInplace(std::vector<u8>& data);
 
 	/**
 	 * @brief Uncompress module data in-place.
 	 * 
 	 * @param data_end The pointer to the end of the data to uncompress.
 	 */
-	void uncompressInplace(u8* data_end);
+	bool uncompressInplace(u8* data_end);
 }
 
 } // nitro

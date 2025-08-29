@@ -43,11 +43,12 @@ bool OverlayBin::load(const u8* ovPtr, const OvtEntry& ovte) {
 
 	m_bytes.assign(ovPtr, ovPtr + (compressed ? ovte.compressed : ovte.ramSize));
 
-	if (compressed)
-		blz::uncompressInplace(m_bytes);
+	if (compressed) {
+		if (!blz::uncompressInplace(m_bytes))
+			return false;
+	}
 
 	return true;
-
 }
 
 bool OverlayBin::readBytes(u32 address, void* out, u32 size) const {

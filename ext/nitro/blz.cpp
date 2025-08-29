@@ -1,37 +1,32 @@
 #include "blz.hpp"
 
 #include <stdexcept>
+#include <iostream>
 
 static const char* s_srcShortageStr = "Source shortage.";
 static const char* s_destOverrunStr = "Destination overrun.";
 
 namespace nitro {
 
-static int CompressBackward_sub2(const u8* a1, const u8* a2, int a3)
-{
+static int CompressBackward_sub2(const u8* a1, const u8* a2, int a3) {
 	int i;
-	for (i = 0; i < a3 && *a1 == *a2; ++i)
-	{
+	for (i = 0; i < a3 && *a1 == *a2; ++i) {
 		--a1;
 		--a2;
 	}
 	return i;
 }
 
-static int CompressBackward_sub1(const u8* a1, int a2, const u8* a3, int a4, int& a5)
-{
+static int CompressBackward_sub1(const u8* a1, int a2, const u8* a3, int a4, int& a5) {
 	u8 v10 = a1[a2 - 1];
 	int v7 = 0;
-	for (int i = 0; i < a4; ++i)
-	{
-		if (a3[i] == v10)
-		{
+	for (int i = 0; i < a4; ++i) {
+		if (a3[i] == v10) {
 			int v6 = i + 1;
 			if (i + 1 > a2)
 				v6 = a2;
 			int v8 = CompressBackward_sub2(&a1[a2 - 1], &a3[i], v6);
-			if (v7 < v8)
-			{
+			if (v7 < v8) {
 				v7 = v8;
 				a5 = i;
 			}
@@ -49,24 +44,20 @@ static int CompressBackward_sub1(const u8* a1, int a2, const u8* a3, int a4, int
  *
  * @return The number of compressed bytes. (in_size - out_size)
  */
-static size_t CompressBackward(const void* src, size_t size, void* dst)
-{
+static size_t CompressBackward(const void* src, size_t size, void* dst) {
 	const u8* src_ = reinterpret_cast<const u8*>(src);
 	u8* dst_ = reinterpret_cast<u8*>(dst);
 
 	size_t v13 = size;
 	size_t v12 = size;
-	while (v13 > 0)
-	{
+	while (v13 > 0) {
 		if (v12 <= 0)
 			return -1;
 		int v11 = 0;
 		int v10 = static_cast<int>(--v12);
-		for (int i = 0; i <= 7; ++i)
-		{
+		for (int i = 0; i <= 7; ++i) {
 			v11 *= 2;
-			if (v13 > 0)
-			{
+			if (v13 > 0) {
 				const u8* v9 = &src_[v13];
 				int v8 = static_cast<int>(size - v13);
 				int v2 = static_cast<int>(v13);
@@ -79,14 +70,12 @@ static size_t CompressBackward(const void* src, size_t size, void* dst)
 					v1 = 4098;
 				int v5;
 				int v4 = CompressBackward_sub1(v7, v6, v9, v1, v5);
-				if (v4 <= 2)
-				{
+				if (v4 <= 2) {
 					if (v12 <= 0)
 						return -1;
 					dst_[--v12] = src_[--v13];
-				}
-				else
-				{
+				
+				} else {
 					if (v12 <= 1)
 						return -1;
 					v13 -= v4;
@@ -109,8 +98,7 @@ static size_t CompressBackward(const void* src, size_t size, void* dst)
  *
  * @param bottom Pointer to input data end.
  */
-static void UncompressBackward(void* bottom)
-{
+static bool UncompressBackward(void* bottom) {
 	u32 offsetOut = *(reinterpret_cast<u32*>(bottom) - 1);
 	u32 offsetIn = *(reinterpret_cast<u32*>(bottom) - 2);
 	u32 offsetInBtm = offsetIn >> 24;
@@ -120,26 +108,33 @@ static void UncompressBackward(void* bottom)
 	u8* pInBtm = reinterpret_cast<u8*>(bottom) - offsetInBtm;
 	u8* pInTop = reinterpret_cast<u8*>(bottom) - offsetInTop;
 
-	while (pInTop < pInBtm)
-	{
+	while (pInTop < pInBtm) {
 		u8 flag = *--pInBtm;
 
-		for (int i = 0; i < 8; ++i)
-		{
-			if (pInBtm < pInTop)
-				throw std::runtime_error(s_srcShortageStr);
+		for (int i = 0; i < 8; ++i) {
 
-			if (pOut < pInTop)
-				throw std::runtime_error(s_destOverrunStr);
-
-			if (!(flag & 0x80))
-			{
-				*--pOut = *--pInBtm;
+			if (pInBtm < pInTop) {
+				std::cout << __LINE__ << ": " << s_srcShortageStr << std::endl;
+				return false;
+				// throw std::runtime_error(s_srcShortageStr);
 			}
-			else
-			{
-				if (pInBtm - 2 < pInTop)
-					throw std::runtime_error(s_destOverrunStr);
+
+			if (pOut < pInTop) {
+				std::cout << __LINE__ << ": " << s_destOverrunStr << std::endl;
+				return false;
+				// throw std::runtime_error(s_destOverrunStr);
+			}
+
+			if (!(flag & 0x80)) {
+				*--pOut = *--pInBtm;
+			
+			} else {
+
+				if (pInBtm - 2 < pInTop) {
+					std::cout << __LINE__ << ": " << s_destOverrunStr << std::endl;
+					return false;
+					// throw std::runtime_error(s_destOverrunStr);
+				}
 
 				u32 length = *--pInBtm;
 				u32 offset = (((length & 0xF) << 8) | (*--pInBtm)) + 3;
@@ -147,8 +142,11 @@ static void UncompressBackward(void* bottom)
 
 				u8* pTmp = pOut + offset;
 
-				if (pOut - length < pInTop)
-					throw std::runtime_error(s_destOverrunStr);
+				if (pOut - length < pInTop) {
+					std::cout << __LINE__ << ": " << s_destOverrunStr << std::endl;
+					return false;
+					// throw std::runtime_error(s_destOverrunStr);
+				}
 
 				for (u32 j = 0; j < length; ++j)
 					*--pOut = *--pTmp;
@@ -160,6 +158,7 @@ static void UncompressBackward(void* bottom)
 			flag <<= 1;
 		}
 	}
+	return true;
 }
 
 namespace blz {
@@ -188,16 +187,16 @@ namespace blz {
 		return dest;
 	}
 
-	void uncompressInplace(std::vector<u8>& data) {
+	bool uncompressInplace(std::vector<u8>& data) {
 		size_t dataSize = data.size();
 		u32 destSize = static_cast<u32>(dataSize) + *reinterpret_cast<u32*>(&data[dataSize - 4]);
 		data.resize(destSize);
 
-		UncompressBackward(data.data() + dataSize);
+		return UncompressBackward(data.data() + dataSize);
 	}
 
-	void uncompressInplace(u8* data_end) {
-		UncompressBackward(data_end);
+	bool uncompressInplace(u8* data_end) {
+		return UncompressBackward(data_end);
 	}
 
 }

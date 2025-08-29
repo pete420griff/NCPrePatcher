@@ -62,7 +62,8 @@ extern "C" {
 	DLL_EXPORT OverlayBin* nitroRom_loadOverlay(NitroRom* rom, u32 id) {
 		OverlayBin* ov = new OverlayBin;
 		const OvtEntry& ovte = rom->getOvtEntry(id);
-		ov->load(static_cast<const u8*>(rom->getFile(ovte.fileID)), ovte);
+		if (!ov->load(static_cast<const u8*>(rom->getFile(ovte.fileID)), ovte))
+			return nullptr;
 		return ov;
 	}
 
