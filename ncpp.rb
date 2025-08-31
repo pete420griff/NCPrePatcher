@@ -74,6 +74,7 @@ module UnarmBind
   typedef :pointer, :cstr_handle
   typedef :pointer, :parser_handle
   typedef :pointer, :symbols_handle
+  typedef :pointer, :ins_args_handle
 
   attach_function :arm9_new_arm_ins, [:uint32], :ins_handle
   attach_function :arm9_new_thumb_ins, [:uint32], :ins_handle
@@ -93,10 +94,15 @@ module UnarmBind
   attach_function :arm9_thumb_ins_to_str_with_syms, [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
   attach_function :arm7_thumb_ins_to_str_with_syms, [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
 
-  attach_function :arm9_arm_get_opcode_id, [:ins_handle], :uint16
-  attach_function :arm7_arm_get_opcode_id, [:ins_handle], :uint16
-  attach_function :arm9_thumb_get_opcode_id, [:ins_handle], :uint16
-  attach_function :arm7_thumb_get_opcode_id, [:ins_handle], :uint16
+  attach_function :arm9_arm_ins_get_args, [:ins_handle], :ins_args_handle
+  attach_function :arm9_arm_ins_get_args, [:ins_handle], :ins_args_handle
+  attach_function :arm9_thumb_ins_get_args, [:ins_handle], :ins_args_handle
+  attach_function :arm7_thumb_ins_get_args, [:ins_handle], :ins_args_handle
+
+  attach_function :arm9_arm_ins_get_opcode_id, [:ins_handle], :uint16
+  attach_function :arm7_arm_ins_get_opcode_id, [:ins_handle], :uint16
+  attach_function :arm9_thumb_ins_get_opcode_id, [:ins_handle], :uint16
+  attach_function :arm7_thumb_ins_get_opcode_id, [:ins_handle], :uint16
 
   attach_function :arm_ins_is_conditional, [:ins_handle], :bool
   attach_function :thumb_ins_is_conditional, [:ins_handle], :bool
@@ -106,6 +112,7 @@ module UnarmBind
 
   attach_function :free_arm_ins, [:ins_handle], :void
   attach_function :free_thumb_ins, [:ins_handle], :void
+  attach_function :free_ins_args, [:ins_args_handle, :uint32], :void
   attach_function :arm9_free_parser, [:parser_handle], :void
   attach_function :arm7_free_parser, [:parser_handle], :void
   attach_function :free_c_str, [:cstr_handle], :void
@@ -132,19 +139,192 @@ module UnarmBind
     :uxth, :wfe, :wfi, :yield
   ].freeze
 
-  CONDITION = [
-    :illegal, :eq, :ne, :hs, :lo, :mi, :pl, :vs, :vc, :hi, :ls, :ge, :lt, :gt, :le, :al
+  CONDITION = [:illegal, :eq, :ne, :hs, :lo, :mi, :pl, :vs, :vc, :hi, :ls, :ge, :lt, :gt, :le, :al].freeze
+
+  REGISTER = [:r0, :r1, :r2, :r3, :r4, :r5, :r6, :r7, :r8, :r9, :r10, :r11, :r12, :sp, :lr, :pc].freeze
+
+  SHIFT = [:lsl, :lsr, :asr, :ror, :rrx].freeze
+
+  CO_REG = [:c0, :c1, :c2, :c3, :c4, :c5, :c6, :c7, :c8, :c9, :c10, :c11, :c12, :c13, :c14, :c15].freeze
+
+  STATUS_REG = [:cpsr, :spsr].freeze
+
+  ARGUMENT_KIND = [
+    :none, :reg, :reg_list, :co_reg, :status_reg, :status_mask, :shift, :shift_imm, :shift_reg,
+    :u_imm, :sat_imm, :s_imm, :offset_imm, :offset_reg, :branch_dest, :co_option, :co_opcode,
+    :coproc_num, :cpsr_mode, :cpsr_flags, :endian
   ].freeze
 
-  REGISTER = [
-    :r0, :r1, :r2, :r3, :r4, :r5, :r6, :r7, :r8, :r9, :r10, :r11, :r12, :sp, :lr, :pc
-  ].freeze
+  ENDIAN = [:le, :be].freeze # illegal=255
 
-  SHIFT = [
-    :lsl, :lsr, :asr, :ror, :rrx
-  ].freeze
+  class RegList < FFI::Struct
+    layout :regs,      :uint32, # bitfield of registers
+           :user_mode, :bool # access user-mode registers from elevated mode
+
+    def contains(register)
+      self[:regs] & (1 << register) != 0
+    end
+
+  end
+
+  class Reg < FFI::Struct
+    layout :deref,     :bool, # use as a base register
+           :reg,       :uint8, # Register
+           :writeback, :bool # when used as a base register, update this register's value
+
+    def reg
+      return :illegal if self[:reg] == 255
+      REGISTER[self[:reg]]
+    end
+  end
+
+  class StatusMask < FFI::Struct
+    layout :control,    :bool, # control field mask (c)
+           :extension,  :bool, # extension field mask (x)
+           :flags,      :bool, # flags field mask (f)
+           :reg,        :uint8, # StatusReg
+           :status,     :bool # status field mask (s)
+
+    def reg
+      return :illegal if self[:reg] == 255
+      REGISTER[self[:reg]]
+    end
+  end
+
+  class ShiftImm < FFI::Struct
+    layout :imm, :uint32, # immediate shift offset
+           :op,  :uint8 # Shift
+
+    def op
+      SHIFT[self[:op]]
+    end
+  end
+
+  class ShiftReg < FFI::Struct
+    layout :op, :uint8, # Shift
+           :reg, :uint8 # Register
+
+    def reg
+      return :illegal if self[:reg] == 255
+      REGISTER[self[:reg]]
+    end
+  end
+
+  class OffsetImm < FFI::Struct
+    layout :post_indexed, :bool # if true, add the offset to the base register and write-back AFTER derefencing the base register
+           :value,        :int32, # offset value
+  end
+
+  class OffsetReg < FFI::Struct
+    layout :add,          :bool, # if true, add the offset to the base register, otherwise subtract
+           :post_indexed, :bool, # if true, add the offset to the base register and write-back AFTER derefencing the base register
+           :reg,          :uint8 # Register
+    
+    def reg
+      return :illegal if self[:reg] == 255
+      REGISTER[self[:reg]]
+    end
+  end
+
+  class CpsrMode < FFI::Struct
+    layout :mode,      :uint32, # mode bits
+           :writeback, :bool # writeback to base register
+  end
+
+  class CpsrFlags < FFI::Struct
+    layout :a,      :bool, # imprecise data abort
+           :enable, :bool, # enable the A/I/F flags if true otherwise disable
+           :f,      :bool, # FIQ interrupt
+           :i,      :bool  # IRQ interrupt
+  end
+
+  class ArgumentValue < FFI::Union
+    layout :reg,         Reg,
+           :reg_list,    RegList,
+           :co_reg,      :uint8,
+           :status_reg,  :uint8,
+           :status_mask, StatusMask,
+           :shift,       :uint8,
+           :shift_imm,   ShiftImm,
+           :shift_reg,   ShiftReg,
+           :u_imm,       :uint32,
+           :sat_imm,     :uint32,
+           :s_imm,       :int32,
+           :offset_imm,  OffsetImm,
+           :offset_reg,  OffsetReg,
+           :branch_dest, :int32,
+           :co_option,   :uint32,
+           :co_opcode,   :uint32,
+           :coproc_num,  :uint32,
+           :cpsr_mode,   CpsrMode,
+           :cpsr_flags,  CpsrFlags,
+           :endian,      :uint8
+
+    def co_reg
+      CO_REG[self[:co_reg]]
+    end
+
+    def status_reg
+      STATUS_REG[self[:status_reg]]
+    end
+
+    def shift
+      SHIFT[self[:shift]]
+    end
+
+    def endian
+      return :illegal if self[:endian] == 255
+      ENDIAN[self[:endian]]
+    end
+  end
+
+  class Argument < FFI::Struct
+    layout :kind, :uint8,
+           :value, ArgumentValue
+
+    def kind
+      ARGUMENT_KIND[self[:kind]]
+    end
+
+    def value
+      raise "No value for argument of kind 'none'" if kind == :none
+      self[:value][kind]
+    end
+  end
+
+  class Arguments < FFI::AutoPointer
+
+    def self.release(ptr)
+      UnarmBind.free_ins_args(ptr, 6)
+    end
+
+    def [](index)
+      raise IndexError, 'there are 6 args' if index < 0 || index >= 6
+      Argument.new(self + index * Argument.size)
+    end
+
+    def each
+      return enum_for(:each) unless block_given?
+      6.times { |i| yield self[i] }
+    end
+
+  end
+
+  Arg = Argument
+  Args = Arguments
+
+  class CStr < FFI::AutoPointer
+    def self.release(ptr)
+      UnarmBind.free_c_str(ptr)
+    end
+
+    def to_s
+      self.read_string
+    end
+  end
 
 end
+
 
 module Nitro
   extend NitroBind
@@ -373,7 +553,7 @@ module Nitro
     end
     alias_method :arm7_ram_addr, :arm7_ram_address
 
-    def get_arm9_ovt_size
+    def arm9_ovt_size
       headerBin_getArm9OvTSize(@ptr)
     end
 
@@ -403,7 +583,7 @@ module Nitro
       @arm7 = ArmBin.new(ptr: FFI::AutoPointer.new(nitroRom_loadArm7(@ptr), method(:armBin_release)))
       @overlay_count = nitroRom_getOverlayCount(@ptr)
       @overlays = Array.new(@overlay_count)
-      @overlay_table = OvtBin.new(ptr: nitroRom_getArm9OvT(@ptr), size: @header.get_arm9_ovt_size)
+      @overlay_table = OvtBin.new(ptr: nitroRom_getArm9OvT(@ptr), size: @header.arm9_ovt_size)
       define_ov_accessors
     end
 
@@ -453,17 +633,6 @@ end
 
 module Unarm
   extend UnarmBind
-
-  class CStr < FFI::AutoPointer
-    def self.release(ptr)
-      UnarmBind.free_c_str(ptr)
-    end
-
-    def to_s
-      self.read_string
-    end
-
-  end
 
   module CPU
     ARM9 = :arm9 # ARMv5Te
@@ -587,11 +756,11 @@ module Unarm
   end
 
   def self.load_symbols9(file_path)
-    @symbols9 = Symbols.new(file_path: file_path, no_raw: true)
+    @symbols9 = Symbols.new(file_path: file_path)
   end
 
   def self.load_symbols7(file_path)
-    @symbols7 = Symbols.new(file_path: file_path, no_raw: true)
+    @symbols7 = Symbols.new(file_path: file_path)
   end
 
   def self.symbol_map
@@ -608,12 +777,7 @@ module Unarm
     syms = loc == 'arm7' ? @symbols7 : @symbols9
     loc = 'arm9' if !syms.locs.has_key?(loc)
     locs = %w[arm7 arm9].include?(loc) ? [loc] : ['arm9', loc]
-    @raw_syms[loc] ||= RawSymbols.new(
-      Symbols.new(
-        syms: syms,
-        locs: locs
-      )
-    )
+    @raw_syms[loc] ||= RawSymbols.new(Symbols.new(syms: syms, locs: locs))
   end
 
   class << self
@@ -628,9 +792,10 @@ module Unarm
       alias_method :disasm, :new
     end
 
-    attr_reader :raw, :opcode_id
+    attr_reader :raw, :opcode_id, :arguments
 
     alias_method :op_id, :opcode_id
+    alias_method :args, :arguments
 
     def string
       @str.to_s
@@ -640,11 +805,9 @@ module Unarm
       def opcode_mnemonic
       UnarmBind::OPCODE[@op_id].to_s
     end
-    alias_method :opcode_string, :opcode_mnemonic
-    alias_method :opcode_str, :opcode_mnemonic
-    alias_method :op_string, :opcode_mnemonic
-    alias_method :op_str, :opcode_mnemonic
     alias_method :op_mnemonic, :opcode_mnemonic
+    alias_method :opcode_str, :opcode_mnemonic
+    alias_method :op_str, :opcode_mnemonic
 
     def is_conditional?
       @conditional
@@ -669,7 +832,8 @@ module Unarm
       else
         @str = CStr.new(send(:"#{Unarm.cpu.to_s}_arm_ins_to_str", @ptr))
       end
-      @op_id = send(:"#{Unarm.cpu.to_s}_arm_get_opcode_id", @ptr)
+      @arguments = Arguments.new(send(:"#{Unarm.cpu.to_s}_arm_ins_get_args", @ptr))
+      @op_id = send(:"#{Unarm.cpu.to_s}_arm_ins_get_opcode_id", @ptr)
       @conditional = arm_ins_is_conditional(@ptr)
       @sets_flags = arm_ins_updates_condition_flags(@ptr)
     end
@@ -687,7 +851,8 @@ module Unarm
       else
         @str = CStr.new(send(:"#{Unarm.cpu.to_s}_thumb_ins_to_str", @ptr))
       end
-      @op_id = send(:"#{Unarm.cpu.to_s}_thumb_get_opcode_id", @ptr)
+      @arguments = Arguments.new(send(:"#{Unarm.cpu.to_s}_thumb_ins_get_args", @ptr))
+      @op_id = send(:"#{Unarm.cpu.to_s}_thumb_ins_get_opcode_id", @ptr)
       @conditional = thumb_ins_is_conditional(@ptr)
       @sets_flags = thumb_ins_updates_condition_flags(@ptr)
     end
