@@ -16,7 +16,7 @@ using namespace nitro;
 extern "C" {
 
 	DLL_EXPORT NitroRom* nitroRom_alloc() {
-		return new NitroRom;
+		return new(std::nothrow) NitroRom;
 	}
 
 	DLL_EXPORT void nitroRom_release(NitroRom* rom) {
@@ -48,19 +48,21 @@ extern "C" {
 	}
 
 	DLL_EXPORT ArmBin* nitroRom_loadArm9(NitroRom* rom) {
-		ArmBin* arm = new ArmBin;
+		ArmBin* arm = new(std::nothrow) ArmBin;
+		if (!arm) return arm;
 		arm->load(rom->data().data(), rom->getHeader().arm9, rom->getHeader().arm9AutoLoadListHookOffset, true);
 		return arm;
 	}
 
 	DLL_EXPORT ArmBin* nitroRom_loadArm7(NitroRom* rom) {
-		ArmBin* arm = new ArmBin;
+		ArmBin* arm = new(std::nothrow) ArmBin;
 		arm->load(rom->data().data(), rom->getHeader().arm7, rom->getHeader().arm7AutoLoadListHookOffset, false);
 		return arm;
 	}
 
 	DLL_EXPORT OverlayBin* nitroRom_loadOverlay(NitroRom* rom, u32 id) {
-		OverlayBin* ov = new OverlayBin;
+		OverlayBin* ov = new(std::nothrow) OverlayBin;
+		if (!ov) return ov;
 		const OvtEntry& ovte = rom->getOvtEntry(id);
 		if (!ov->load(static_cast<const u8*>(rom->getFile(ovte.fileID)), ovte))
 			return nullptr;
@@ -77,7 +79,7 @@ extern "C" {
 
 
 	DLL_EXPORT HeaderBin* headerBin_alloc() {
-		return new HeaderBin;
+		return new(std::nothrow) HeaderBin;
 	}
 
 	DLL_EXPORT void headerBin_release(HeaderBin* header) {
@@ -171,7 +173,7 @@ extern "C" {
 
 
 	DLL_EXPORT ArmBin* armBin_alloc() {
-		return new ArmBin;
+		return new(std::nothrow) ArmBin;
 	}
 
 	DLL_EXPORT void armBin_release(ArmBin* arm) {
@@ -188,7 +190,7 @@ extern "C" {
 
 
 	DLL_EXPORT OverlayBin* overlayBin_alloc() {
-		return new OverlayBin;
+		return new(std::nothrow) OverlayBin;
 	}
 
 	DLL_EXPORT void overlayBin_release(OverlayBin* ov) {
