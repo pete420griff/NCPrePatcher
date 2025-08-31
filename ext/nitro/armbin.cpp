@@ -49,14 +49,14 @@ bool ArmBin::load(const fs::path& path, u32 entryAddr, u32 ramAddr, u32 autoLoad
 
 	m_moduleParamsOffset = *reinterpret_cast<u32*>(&bytesData[autoLoadHookOffset - m_ramAddr - 4]) - m_ramAddr;
 
-	std::cout << "Found ModuleParams at: 0x" << std::uppercase << std::hex << m_moduleParamsOffset << std::endl;
+	// std::cout << "Found ModuleParams at: 0x" << std::uppercase << std::hex << m_moduleParamsOffset << std::endl;
 
 	ModuleParams* moduleParams = getModuleParams();
 
 	// DECOMPRESS ================================
 
 	if (moduleParams->compStaticEnd) {
-		std::cout << "Decompressing arm" << (isArm9 ? "9" : "7") << " binary..." << std::endl;
+		// std::cout << "Decompressing arm" << (isArm9 ? "9" : "7") << " binary..." << std::endl;
 
 		u32 decompSize = static_cast<u32>(fileSize) + *reinterpret_cast<u32*>(&bytesData[moduleParams->compStaticEnd - m_ramAddr - 4]);
 
@@ -73,8 +73,8 @@ bool ArmBin::load(const fs::path& path, u32 entryAddr, u32 ramAddr, u32 autoLoad
 			return false;
 		}
 
-		std::cout << "  Old size: 0x" << fileSize << std::endl;
-		std::cout << "  New size: 0x" << decompSize << std::endl;
+		// std::cout << "  Old size: 0x" << fileSize << std::endl;
+		// std::cout << "  New size: 0x" << decompSize << std::endl;
 
 		moduleParams->compStaticEnd = 0;
 	}
@@ -105,7 +105,7 @@ bool ArmBin::load(const u8* romPtr, const ARMBinaryInfo& info, u32 autoLoadHookO
 	ModuleParams* moduleParams = getModuleParams();
 
 	if (moduleParams->compStaticEnd) {
-		std::cout << "Decompressing arm" << (isArm9 ? "9" : "7") << " binary..." << std::endl;
+		// std::cout << "Decompressing arm" << (isArm9 ? "9" : "7") << " binary..." << std::endl;
 
 		u32 decompSize = static_cast<u32>(info.size) + *reinterpret_cast<u32*>(&bytesData[moduleParams->compStaticEnd - m_ramAddr - 4]);
 
@@ -122,8 +122,8 @@ bool ArmBin::load(const u8* romPtr, const ARMBinaryInfo& info, u32 autoLoadHookO
 			return false;
 		}
 
-		std::cout << "  Old size: 0x" << info.size << std::endl;
-		std::cout << "  New size: 0x" << decompSize << std::endl;
+		// std::cout << "  Old size: 0x" << info.size << std::endl;
+		// std::cout << "  New size: 0x" << decompSize << std::endl;
 
 		moduleParams->compStaticEnd = 0;
 	}
