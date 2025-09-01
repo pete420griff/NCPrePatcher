@@ -61,7 +61,7 @@ def build_nitro
   end
   # Move lib to main dir
   lib_path = NITRO_BUILD_PATH + (OS.windows? ? 'Release/' : '') + NITRO_LIB_NAME
-  lib_dest = '../nitro' + LIB_EXT
+  lib_dest = '../lib/nitro' + LIB_EXT
   puts "Moving #{lib_path} to #{lib_dest}"
   begin
     FileUtils.move lib_path, lib_dest
@@ -81,7 +81,7 @@ def build_unarm
   end
 
   lib_path = UNARM_BUILD_PATH + 'target/release/' + UNARM_LIB_NAME
-  lib_dest = '../unarm' + LIB_EXT
+  lib_dest = '../lib/unarm' + LIB_EXT
   puts "Moving #{lib_path} to #{lib_dest}"
   begin
     FileUtils.move lib_path, lib_dest

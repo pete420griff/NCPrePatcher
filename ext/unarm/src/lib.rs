@@ -302,6 +302,17 @@ macro_rules! make_ins_is_conditional_fn {
 	};
 }
 
+macro_rules! make_ins_is_data_operation_fn {
+	($fn_name:ident, $ins_type:path) => {
+		#[no_mangle]
+		pub extern "C" fn $fn_name(ins: *const $ins_type) -> bool {
+			unsafe {
+				(&*ins).is_data_operation()
+			}
+		}
+	}
+}
+
 macro_rules! make_ins_updates_condition_flags_fn {
 	($fn_name:ident, $ins_type:path) => {
 		#[no_mangle]
@@ -379,6 +390,9 @@ make_get_ins_args_fn!(arm7_thumb_ins_get_args, thumb::Ins, ARM7_PARSE_FLAGS);
 make_ins_is_conditional_fn!(arm_ins_is_conditional, arm::Ins);
 make_ins_is_conditional_fn!(thumb_ins_is_conditional, thumb::Ins);
 
+make_ins_is_data_operation_fn!(arm_ins_is_data_operation, arm::Ins);
+make_ins_is_data_operation_fn!(thumb_ins_is_data_operation, thumb::Ins);
+
 make_ins_updates_condition_flags_fn!(arm_ins_updates_condition_flags, arm::Ins);
 make_ins_updates_condition_flags_fn!(thumb_ins_updates_condition_flags, thumb::Ins);
 
@@ -389,6 +403,7 @@ make_new_parser_fn!(arm9_new_parser, ARM9_PARSE_FLAGS);
 make_new_parser_fn!(arm7_new_parser, ARM7_PARSE_FLAGS);
 make_free_parser_fn!(arm9_free_parser);
 make_free_parser_fn!(arm7_free_parser);
+
 
 #[no_mangle]
 pub extern "C" fn free_ins_args(ptr: *mut CArgument, len: usize) {
