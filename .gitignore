@@ -9,6 +9,7 @@ ext/unarm/target/
 # Include only these file from root directory
 !ncpp.rb
 !/ext/
+!/lib/
 !Gemfile
 !Gemfile.lock
 !README.md
