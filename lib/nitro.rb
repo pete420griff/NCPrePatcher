@@ -2,7 +2,11 @@ require 'ffi'
 
 module NitroBind
   extend FFI::Library
-  ffi_lib [Dir.pwd + '/lib/nitro', 'lib/nitro.dylib', 'lib/nitro.so']
+  ffi_lib [
+    File.expand_path("nitro", __dir__),
+    File.expand_path("nitro.dylib", __dir__),
+    File.expand_path("nitro.so", __dir__),
+  ]
 
   typedef :pointer, :rom_handle
   typedef :pointer, :header_handle

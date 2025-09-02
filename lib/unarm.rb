@@ -3,7 +3,11 @@ require_relative 'utils.rb'
 
 module UnarmBind
   extend FFI::Library
-  ffi_lib [Dir.pwd + '/lib/unarm', 'lib/unarm.dylib', 'lib/unarm.so']
+  ffi_lib [
+    File.expand_path("unarm", __dir__),
+    File.expand_path("unarm.dylib", __dir__),
+    File.expand_path("unarm.so", __dir__),
+  ]
 
   typedef :pointer, :ins_handle
   typedef :pointer, :cstr_handle
@@ -553,6 +557,11 @@ module Unarm
       @str.to_s
     end
     alias_method :str, :string
+
+    def eql?(other)
+      string == other.string
+    end
+    alias_method :==, :eql?
 
     def opcode
       UnarmBind::OPCODE[@op_id]
