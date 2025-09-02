@@ -9,8 +9,12 @@ ext/unarm/target/
 # Include only these file from root directory
 !ncpp.rb
 !/ext/
+!/exe/
+!/bin/
 !/lib/*.rb
 !Gemfile
 !Gemfile.lock
+!*.gemspec
 !README.md
+!LICENSE.txt
 !.gitignore
