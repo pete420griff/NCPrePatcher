@@ -305,7 +305,7 @@ module Nitro
       @ptr = FFI::AutoPointer.new(nitroRom_alloc, method(:nitroRom_release))
 
       # Check whether file exists here because if C++ throws an exception we get a segfault
-      if not File.exist? file_path
+      if !File.exist?(file_path)
         puts "Error: #{file_path} does not exist"
         raise "Rom initialization failed"
       end
