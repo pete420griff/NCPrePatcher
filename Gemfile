@@ -3,3 +3,4 @@
 source "https://rubygems.org"
 
 gem 'ffi', '~> 1.17', '>= 1.17.2'
+gem 'parslet', '~> 2.0'

@@ -2,12 +2,14 @@ GEM
   remote: https://rubygems.org/
   specs:
     ffi (1.17.2-x64-mingw-ucrt)
+    parslet (2.0.0)
 
 PLATFORMS
   x64-mingw-ucrt
 
 DEPENDENCIES
   ffi (~> 1.17, >= 1.17.2)
+  parslet (~> 2.0)
 
 BUNDLED WITH
    2.6.9

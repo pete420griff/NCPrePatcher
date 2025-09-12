@@ -6,7 +6,7 @@ Gem::Specification.new do |spec|
   spec.authors = ["Will Smith"]
   spec.email = ["willsmithofficial2222@gmail.com"]
 
-  spec.summary = ""
+  spec.summary = "A preprocessor for NCPatcher"
   spec.homepage = "https://github.com/pete420griff/NCPrePatcher"
   spec.license = "GPL-3.0-only"
   spec.required_ruby_version = ">= 3.1"
