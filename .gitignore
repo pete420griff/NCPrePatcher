@@ -11,8 +11,8 @@ ext/unarm/target/
 !/exe/
 !/bin/
 !/lib/
-/lib/*
-!/lib/*.rb
+/lib/*/*
+!/lib/*/*.rb
 !Gemfile
 !Gemfile.lock
 !*.gemspec

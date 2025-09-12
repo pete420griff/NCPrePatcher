@@ -342,7 +342,7 @@ module Nitro
 
     def get_overlay(id)
       raise IndexError if id > @overlay_count-1
-      load_overlay(id) if @overlays[id] == nil
+      load_overlay(id) if @overlays[id].nil?
       @overlays[id]
     end
     alias_method :get_ov, :get_overlay

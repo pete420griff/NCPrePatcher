@@ -1,6 +1,6 @@
-require_relative 'nitro.rb'
-require_relative 'unarm.rb'
-require_relative 'utils.rb'
+require_relative 'nitro/nitro.rb'
+require_relative 'unarm/unarm.rb'
+require_relative 'ncpp/interpreter.rb'
 
 require 'json'
 
@@ -14,15 +14,17 @@ module NCPP
   alias $virgin_rom $clean_rom # for good measure
   alias $unmolested_rom $clean_rom
 
+
   @@config_template = {
     clean_rom: '', target_rom: '',
     sources: [], # each entry: [string path, bool search_recursive]
     source_file_types: ['cpp','hpp','c','h'],
     symbols9: '', symbols7: '',
-    output_path: 'ncpp_gen' # gets auto-created
+    backup_path: 'backup/ncpp'
   }
 
   @@required_config_fields = [:clean_rom, :sources]
+
 
   def self.glean_from_ncp_config(cfg)
     return cfg if !File.exist?('ncpatcher.json')
@@ -45,7 +47,7 @@ module NCPP
 
   def self.get_missing_config_reqs(cfg)
     missing_fields = []
-    req_fields = @@required_config_fields#.map(&:to_s)
+    req_fields = @@required_config_fields
 
     cfg.each do |field, value|
       next unless req_fields.include? field
@@ -69,7 +71,7 @@ module NCPP
       puts "Created #{cfg_path} in current directory."
       missing = get_missing_config_reqs(cfg)
       if !missing.empty?
-        puts "Please fill out the following fields:"
+        puts "Please fill out the following field#{missing.length > 1 ? 's' : ''}:"
         missing.each { |field| puts "- #{field.to_s}"}
         puts; exit
       end
@@ -79,8 +81,8 @@ module NCPP
       missing = get_missing_config_reqs(cfg)
 
       if !missing.empty?
-        puts "Please fill out the following required fields in #{cfg_path}:"
-        missing.each { |field| puts "- #{field.to_s}"}
+        puts "Please fill out the following required field#{missing.length > 1 ? 's' : ''} in #{cfg_path}:"
+        missing.each {|field| puts "- #{field.to_s}"}
         puts; exit
       end
     end
@@ -94,7 +96,6 @@ module NCPP
 
   end
 
-
   def self.run(args)
 
     init
@@ -105,10 +106,10 @@ module NCPP
     puts "Size: #{($clean_rom.size / 1024.0 / 1024.0).round(2)} MB"
     puts "Overlay count: #{$clean_rom.overlay_count}\n\n"
 
-    $config['sources'].each do |src, recursive|
-      files = Dir["#{src}/*#{recursive ? '*/*' : ''}.{#{$config['source_file_types'].join(',')}}"]
-      puts files
-    end
+    # $config['sources'].each do |src, recursive|
+    #   files = Dir["#{src}/*#{recursive ? '*/*' : ''}.{#{$config['source_file_types'].join(',')}}"]
+    #   files.each { |file| parse_file(file) }
+    # end
 
   end
 

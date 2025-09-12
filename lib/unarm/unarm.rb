@@ -1,5 +1,4 @@
 require 'ffi'
-require_relative 'utils.rb'
 
 module UnarmBind
   extend FFI::Library
@@ -136,7 +135,7 @@ module UnarmBind
 
     def contains?(register)
       register = REGISTER_MAP[register] if register.is_a? Symbol
-      raise 'Invalid register' if register == nil || (register.is_a?(Integer) && register >= REGISTER_MAP.length)
+      raise 'Invalid register' if register.nil? || (register.is_a?(Integer) && register >= REGISTER_MAP.length)
       self[:regs] & (1 << register) != 0
     end
 
@@ -446,16 +445,13 @@ module Unarm
 
           parts[1] = parts[1].chomp(';') if parts[1].end_with?(';')
 
-          begin
-            addr = parts[1].from_hex
-            parts[1] = addr - (addr & 1)
-            syms[parts[0]] = parts[1]
-            if dest
-              locs[dest] = Array.new unless locs[dest]
-              locs[dest] << parts[0]
-            end
-          rescue
-            # Ignore if address cannot be converted to hex
+          addr = parts[1].hex
+          next if addr <= 0
+          parts[1] = addr - (addr & 1)
+          syms[parts[0]] = parts[1]
+          if dest
+            locs[dest] = Array.new unless locs[dest]
+            locs[dest] << parts[0]
           end
 
         end
@@ -591,7 +587,7 @@ module Unarm
     end
     alias_method :updates_condition_flags?, :sets_flags?
 
-    def has_imod? # modifies interrupt flags?
+    def has_imod? # does instruction modify interrupt flags?
       opcode == :cps
     end
 
@@ -627,7 +623,7 @@ module Unarm
       @sets_flags  = arm_ins_updates_condition_flags(@ptr)
     end
 
-    def is_compare_operation? # opcode compares a register with another value?
+    def is_compare_operation? # does opcode compare a register with another value?
       [:cmn, :cmp, :teq, :tst].include? opcode
     end
     alias_method :is_compare_op?, :is_compare_operation?
