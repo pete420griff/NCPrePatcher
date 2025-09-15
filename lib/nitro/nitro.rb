@@ -185,7 +185,8 @@ module Nitro
           puts "Error: #{args[:file_path]} does not exist"
           raise 'ArmBin initialization failed'
         end
-        armBin_load(@ptr, args[:file_path], args[:entry_addr], args[:ram_addr], args[:auto_load_hook_offset], args[:is_arm9] || true)
+        armBin_load(@ptr, args[:file_path], args[:entry_addr], args[:ram_addr], args[:auto_load_hook_offset],
+                    args[:is_arm9] || true)
 
       elsif args.has_key?(:ptr) && args[:ptr].is_a?(FFI::AutoPointer)
         @ptr = args[:ptr]

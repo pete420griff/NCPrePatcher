@@ -1,16 +1,20 @@
 require_relative 'utils.rb'
 require_relative 'version.rb'
+require_relative '../nitro/nitro.rb'
+require_relative '../unarm/unarm.rb'
 
 module NCPP
 
-  @@COMMAND_PREFIX = 'ncpp_'
+  COMMAND_PREFIX = 'ncpp_'
 
-  @@CORE_COMMANDS = {
+  CORE_COMMANDS = {
     put: ->(x) { String(x) }.returns(String),
 
     if:    ->(out,cond) { cond ? (out.is_a?(Block) ? out.call : out) : nil }.returns(Object),
     elsif: ->(out, cond, alt_out) { out.nil? ? (cond ? (alt_out.is_a?(Block) ? alt_out.call : alt_out) : nil ) : out },
-    else:  ->(out, alt_out) { out.nil? ? (alt_out.is_a?(Block) ? alt_out.call : alt_out) : (out.is_a?(Block) ? out.call : out) }.returns(Object),
+    else:  ->(out, alt_out) do
+      out.nil? ? (alt_out.is_a?(Block) ? alt_out.call : alt_out) : (out.is_a?(Block) ? out.call : out)
+    end.returns(Object),
 
     then: ->(_, block) do
       raise "then expects a block" unless block.is_a?(Block)
@@ -49,7 +53,9 @@ module NCPP
 
     penis: ->(size=1) { '8' + '='*size + 'D' }.returns(String),
 
-    rand: ->(n1=nil,n2=nil) { n1.nil? ? Random.rand() : (n2.nil? ? Random.rand(n1) : Random.rand(n1..n2)) }.returns(Numeric),
+    rand: ->(n1=nil,n2=nil) do
+      n1.nil? ? Random.rand() : (n2.nil? ? Random.rand(n1) : Random.rand(n1..n2))
+    end.returns(Numeric),
     add: ->(a,b) { a + b }.returns(Numeric),
     sub: ->(a,b) { a - b }.returns(Numeric),
     mul: ->(a,b) { a * b }.returns(Numeric),
@@ -75,11 +81,13 @@ module NCPP
     set_thook: ->(addr,ov=nil) { Utils::gen_hook_str('set_thook', addr, ov) }.returns(String),
     set_tcall: ->(addr,ov=nil) { Utils::gen_hook_str('set_tcall', addr, ov) }.returns(String),
     set_tjump: ->(addr,ov=nil) { Utils::gen_hook_str('set_tjump', addr, ov) }.returns(String),
-    repl:      ->(addr,ov_or_asm,asm=nil) { "ncp_repl(#{addr.to_hex}#{',' if ov_or_asm}#{'"' if !asm}#{ov_or_asm}#{asm ? ',' : '"'}#{"\"#{asm}\"" if asm})" }.returns(String)
+    repl:      ->(addr,ov_or_asm,asm=nil) do
+      "ncp_repl(#{addr.to_hex}#{',' if ov_or_asm}#{'"' if !asm}#{ov_or_asm}#{asm ? ',' : '"'}#{"\"#{asm}\"" if asm})"
+    end.returns(String)
   }.freeze
 
 
-  @@CORE_VARIABLES = {
+  CORE_VARIABLES = {
     NCPP_VERSION: VERSION,
     BUILD_DATE: Time.now.to_s,
     PI: Math::PI

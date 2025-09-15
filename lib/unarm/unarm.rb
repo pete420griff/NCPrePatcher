@@ -27,10 +27,14 @@ module UnarmBind
   attach_function :arm9_thumb_ins_to_str, [:ins_handle], :cstr_handle
   attach_function :arm7_thumb_ins_to_str, [:ins_handle], :cstr_handle
 
-  attach_function :arm9_arm_ins_to_str_with_syms, [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
-  attach_function :arm7_arm_ins_to_str_with_syms, [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
-  attach_function :arm9_thumb_ins_to_str_with_syms, [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
-  attach_function :arm7_thumb_ins_to_str_with_syms, [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
+  attach_function :arm9_arm_ins_to_str_with_syms,
+    [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
+  attach_function :arm7_arm_ins_to_str_with_syms,
+    [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
+  attach_function :arm9_thumb_ins_to_str_with_syms,
+    [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
+  attach_function :arm7_thumb_ins_to_str_with_syms,
+    [:ins_handle, :symbols_handle, :uint32, :uint32, :int32], :cstr_handle
 
   attach_function :arm9_arm_ins_get_args, [:ins_handle], :ins_args_handle
   attach_function :arm7_arm_ins_get_args, [:ins_handle], :ins_args_handle
@@ -222,7 +226,7 @@ module UnarmBind
   end
 
   class OffsetImm < FFI::Struct
-    layout :post_indexed, :bool, # if true, add the offset to the base register and write-back AFTER derefencing the base register
+    layout :post_indexed, :bool, # if true, add offset to base register and write-back AFTER derefencing base register
            :value,        :int32 # offset value
 
     def post_indexed?
@@ -236,8 +240,8 @@ module UnarmBind
   end
 
   class OffsetReg < FFI::Struct
-    layout :add,          :bool, # if true, add the offset to the base register, otherwise subtract
-           :post_indexed, :bool, # if true, add the offset to the base register and write-back AFTER derefencing the base register
+    layout :add,          :bool, # if true, add offset to base register, otherwise subtract
+           :post_indexed, :bool, # if true, add offset to base register and write-back AFTER derefencing base register
            :reg,          :uint8 # Register
 
     def add?
@@ -405,8 +409,11 @@ module Unarm
     @cpu = CPU::ARM7
   end
 
+  def self.symbols9 = @symbols9
+  def self.symbols7 = @symbols7
+
   def self.symbols
-    @cpu == CPU::ARM9 ? @symbols9 : @symbols7
+    @cpu == CPU::ARM9 ? symbols9 : symbols7
   end
 
   def self.raw_syms

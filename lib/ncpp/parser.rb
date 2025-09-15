@@ -8,9 +8,11 @@ module NCPP
       @COMMAND_PREFIX = cmd_prefix
     end
 
-    def parse(str, root: :line, **opts)
-      send(root).parse(str, **opts)
+    def parse(str, root: :line)
+      send(root).parse(str)
     end
+
+    root :line
 
     rule :line do
       space? >>
@@ -71,7 +73,8 @@ module NCPP
     end
 
     rule :chained_command do
-      (command|boolean|variable|group|block|float|integer|string).as(:base) >> (str('.') >> command.as(:next)).repeat.as(:chain)
+      (command|boolean|variable|group|block|float|integer|string).as(:base) >>
+        (str('.') >> command.as(:next)).repeat.as(:chain)
     end
 
 
