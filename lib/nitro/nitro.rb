@@ -173,6 +173,32 @@ module Nitro
       clamped.step(step).map { |addr| [send(:"read#{step * 8}", addr), addr] }
     end
 
+    def each_word
+      read.each do |word, addr|
+        yield word, addr
+      end
+    end
+
+    def each_doubleword
+      read(bounds,8).each do |dword, addr|
+        yield dw, addr
+      end
+    end
+    alias_method :each_dword, :each_doubleword
+
+    def each_halfword
+      read(bounds,2).each do |hword, addr|
+        yield hword, addr
+      end
+    end
+    alias_method :each_hword, :each_halfword
+
+    def each_byte
+      read(bounds,1).each do |byte, addr|
+        yield byte, addr
+      end
+    end
+
   end
 
   class ArmBin < CodeBin
@@ -347,6 +373,13 @@ module Nitro
       @overlays[id]
     end
     alias_method :get_ov, :get_overlay
+
+    def each_overlay
+      @overlay_count.times do |i|
+        yield get_overlay(i), i
+      end
+    end
+    alias_method :each_ov, :each_overlay
 
 private
     def define_ov_accessors
