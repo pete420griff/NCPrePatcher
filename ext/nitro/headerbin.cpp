@@ -10,24 +10,16 @@ namespace nitro {
 
 bool HeaderBin::load(const fs::path& path) {
 
-	if (!fs::exists(path)) {
-		// LOG_ERROR("Could not find file.");
+	if (!fs::exists(path))
 		return false;
-	}
 
 	std::ifstream headerFile(path, std::ios::binary);
-	if (!headerFile.is_open()) {
-		// LOG_ERROR("Could not read file.");
+	if (!headerFile.is_open())
 		return false;
-	}
 
 	uintmax_t headerSize = fs::file_size(path);
 	if (headerSize < 512) {
-
 		headerFile.close();
-
-		// LOG_ERROR("Invalid ROM header file: {}", path.string());
-		// LOG_ERROR("Expected a minimum of 512 bytes, got {} bytes.", headerSize);
 		return false;
 	}
 
