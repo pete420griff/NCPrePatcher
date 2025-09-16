@@ -18,6 +18,7 @@ module NCPP
   $config = nil
 
   CONFIG_FILE_PATH     = 'ncpp_config.json'
+  NCPP_DEFS_FILENAME   = 'ncpp_defs.rb'
   NCP_CONFIG_FILE_PATH = 'ncpatcher.json'
 
   CONFIG_TEMPLATE = {
@@ -162,14 +163,14 @@ module NCPP
   end
 
   def self.run(args)
-    config_file = nil
-    use_config  = true
-    interactive = false
-    quiet       = false
+    config_filename = nil
+    use_config      = true
+    interactive     = false
+    quiet           = false
 
     OptionParser.new do |opts|
       opts.on('--config FILE', 'Specify a config file') do |f|
-        config_file = f
+        config_filename = f
       end
 
       opts.on('--no-config', 'Don\'t use a config file') do
@@ -200,8 +201,8 @@ module NCPP
       end
     end.parse!(args)
 
-    if config_file
-      init(config_file)
+    if config_filename
+      init(config_filename)
     elsif use_config
       init
     end
@@ -214,16 +215,29 @@ module NCPP
     show_rom_info($rom) unless quiet || $rom.nil?
 
     timestamp_cache_path = File.join($config['gen_path'], 'timestamp_cache.json')
-    if File.exist?(timestamp_cache_path)
-      timestamp_cache = JSON.load_file(timestamp_cache_path)
-    else
-      timestamp_cache = {}
-      # FileUtils.mkdir_p(File.dirname(timestamp_cache_path))
-    end
+    timestamp_cache = File.exist?(timestamp_cache_path) ? JSON.load_file(timestamp_cache_path) : {}
 
     exts = $config['source_file_types'].join(',')
 
     $config['sources'].each do |src|
+      extra_commands  = {}
+      extra_variables = {}
+
+      ncpp_defs_file_path = File.join(src.sub('*', ''), NCPP_DEFS_FILENAME)
+      defs_modified = false
+
+      if File.exist?(ncpp_defs_file_path)
+        last_modified = File.mtime(ncpp_defs_file_path).to_s
+        defs_modified = !timestamp_cache[ncpp_defs_file_path].eql?(last_modified)
+        timestamp_cache[ncpp_defs_file_path] = last_modified
+
+        mod = Module.new
+        mod.module_eval(File.read(ncpp_defs_file_path), ncpp_defs_file_path)
+
+        extra_commands  = mod.const_get(:COMMANDS)  if mod.const_defined?(:COMMANDS)
+        extra_variables = mod.const_get(:VARIABLES) if mod.const_defined?(:VARIABLES)
+      end
+
       if File.file?(src)
         files = [src]
       else
@@ -237,30 +251,39 @@ module NCPP
         files = Dir.glob(pattern)
       end
 
-      files.delete_if do |file|
-        last_modified = File.mtime(file).to_s
-        not_modified = timestamp_cache[file]&.eql?(last_modified)
-        timestamp_cache[file] = last_modified
-        if file.end_with?('.s')
-          if !not_modified && !not_modified.nil?
-            dest = File.join($config['gen_path'], file)
-            FileUtils.mkdir_p(File.dirname(dest))
-            FileUtils.cp(file, dest)
-          end
-          true
-        elsif not_modified
+      timestamp_cache.delete_if do |file, _mtime|
+        if !File.exist?(file)
+          File.delete(File.join($config['gen_path'], file))
           true
         else
           false
         end
       end
 
-      CFileInterpreter.new(files, $config['gen_path']).run
+      files.delete_if do |file|
+        last_modified = File.mtime(file).to_s
+        modified = !timestamp_cache[file]&.eql?(last_modified)
+        timestamp_cache[file] = last_modified
+        if file.end_with?('.s')
+          if modified || modified.nil?
+            dest = File.join($config['gen_path'], file)
+            FileUtils.mkdir_p(File.dirname(dest))
+            FileUtils.cp(file, dest)
+          end
+          true
+        elsif !modified && !defs_modified
+          true
+        else
+          false
+        end
+      end
+
+      CFileInterpreter.new(files, $config['gen_path'], $config['command_prefix'], extra_commands, extra_variables).run
     end
 
     FileUtils.mkdir_p(File.dirname(timestamp_cache_path))
     File.write(timestamp_cache_path, JSON.generate(timestamp_cache))
-  
+
     puts
     ARGV.clear
   end

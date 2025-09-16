@@ -108,7 +108,7 @@ module NCPP
   # Scans C/C++ source files for commands and expands them in place
   #
   class CFileInterpreter < Interpreter
-    def initialize(file_list, out_path, cmd_prefix: COMMAND_PREFIX, extra_cmds: {}, extra_vars: {})
+    def initialize(file_list, out_path, cmd_prefix = COMMAND_PREFIX, extra_cmds = {}, extra_vars = {})
       super(cmd_prefix, extra_cmds, extra_vars)
       @file_list = file_list.is_a?(Array) ? file_list : [file_list]
       @out_path = out_path
