@@ -12,6 +12,7 @@ ext/unarm/target/
 !/ext/
 !/exe/
 !/bin/
+!/example/
 !/lib/
 /lib/*/*
 !/lib/*/*.rb
