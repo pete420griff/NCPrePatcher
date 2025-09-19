@@ -1,7 +1,5 @@
 require_relative 'utils.rb'
 require_relative 'version.rb'
-require_relative '../nitro/nitro.rb'
-require_relative '../unarm/unarm.rb'
 
 module NCPP
 
@@ -10,9 +8,12 @@ module NCPP
   CORE_COMMANDS = {
     put: ->(x) { String(x) }.returns(String),
 
-    if:    ->(out,cond) { cond ? (out.is_a?(Block) ? out.call : out) : nil }.returns(Object),
-    elsif: ->(out, cond, alt_out) { out.nil? ? (cond ? (alt_out.is_a?(Block) ? alt_out.call : alt_out) : nil ) : out },
-    else:  ->(out, alt_out) do
+    if: ->(out,cond) { cond ? (out.is_a?(Block) ? out.call : out) : nil }.returns(Object),
+
+    elsif: ->(out, cond, alt_out) { out.nil? ? (cond ? (alt_out.is_a?(Block) ? alt_out.call : alt_out) : nil ) : out }
+      .returns(Object),
+
+    else: ->(out, alt_out) do
       out.nil? ? (alt_out.is_a?(Block) ? alt_out.call : alt_out) : (out.is_a?(Block) ? out.call : out)
     end.returns(Object),
 
@@ -33,57 +34,56 @@ module NCPP
 
     console_log: ->(msg) { puts msg },
 
-    float: ->(n) { Float(n) }.returns(Float),
-    int: ->(n) { Integer(n) }.returns(Integer),
-    is_even: ->(i) { i.to_i.even? },
-    is_odd: ->(i) { i.to_i.odd? },
+    float: ->(n) { Float(n) }.returns(Float).cacheable,
+    int: ->(n) { Integer(n) }.returns(Integer).cacheable,
+    is_even: ->(i) { i.to_i.even? }.cacheable,
+    is_odd: ->(i) { i.to_i.odd? }.cacheable,
 
-    hex: ->(i) { i.to_hex }.returns(String),
-    str: ->(x) { String(x) }.returns(String),
-    strlen: ->(s) { s.length }.returns(Integer),
-    upcase:   ->(str) { str.upcase }.returns(String),
-    downcase: ->(str) { str.downcase }.returns(String),
+    hex: ->(i) { i.to_hex }.returns(String).cacheable,
+    str: ->(x) { String(x) }.returns(String).cacheable,
+    strlen: ->(s) { s.length }.returns(Integer).cacheable,
+    upcase:   ->(str) { str.upcase }.returns(String).cacheable,
+    downcase: ->(str) { str.downcase }.returns(String).cacheable,
 
-    year:   -> { Time.now.year }.returns(Integer),
-    month:  -> { Time.now.month }.returns(Integer),
-    day:    -> { Time.now.day }.returns(Integer),
-    hour:   -> { Time.now.hour }.returns(Integer),
+    year:  -> { Time.now.year }.returns(Integer),
+    month: -> { Time.now.month }.returns(Integer),
+    day:   -> { Time.now.day }.returns(Integer),
+    hour:  -> { Time.now.hour }.returns(Integer),
     min:   -> { Time.now.min }.returns(Integer),
     sec:   -> { Time.now.sec }.returns(Integer),
-
-    penis: ->(size=1) { '8' + '='*size + 'D' }.returns(String),
 
     rand: ->(n1=nil,n2=nil) do
       n1.nil? ? Random.rand() : (n2.nil? ? Random.rand(n1) : Random.rand(n1..n2))
     end.returns(Numeric),
-    add: ->(a,b) { a + b }.returns(Numeric),
-    sub: ->(a,b) { a - b }.returns(Numeric),
-    mul: ->(a,b) { a * b }.returns(Numeric),
-    div: ->(a,b) { a / b }.returns(Numeric),
-    mod: ->(a,b) { a % b }.returns(Numeric),
-    sin: ->(n) { Math.sin(n) }.returns(Float),
-    cos: ->(n) { Math.cos(n) }.returns(Float),
-    tan: ->(n) { Math.tan(n) }.returns(Float),
-    exp: ->(n) { Math.exp(n) }.returns(Float),
-    log: ->(n) { Math.log(n) }.returns(Float),
-    sqrt: ->(n) { Math.sqrt(n) }.returns(Float),
 
-    over:      ->(addr,ov=nil) { Utils::gen_hook_str('over', addr, ov) }.returns(String),
-    hook:      ->(addr,ov=nil) { Utils::gen_hook_str('hook', addr, ov) }.returns(String),
-    call:      ->(addr,ov=nil) { Utils::gen_hook_str('call', addr, ov) }.returns(String),
-    jump:      ->(addr,ov=nil) { Utils::gen_hook_str('jump', addr, ov) }.returns(String),
-    thook:     ->(addr,ov=nil) { Utils::gen_hook_str('thook', addr, ov) }.returns(String),
-    tcall:     ->(addr,ov=nil) { Utils::gen_hook_str('tcall', addr, ov) }.returns(String),
-    tjump:     ->(addr,ov=nil) { Utils::gen_hook_str('tjump', addr, ov) }.returns(String),
-    set_hook:  ->(addr,ov=nil) { Utils::gen_hook_str('set_hook', addr, ov) }.returns(String),
-    set_call:  ->(addr,ov=nil) { Utils::gen_hook_str('set_call', addr, ov) }.returns(String),
-    set_jump:  ->(addr,ov=nil) { Utils::gen_hook_str('set_jump', addr, ov) }.returns(String),
-    set_thook: ->(addr,ov=nil) { Utils::gen_hook_str('set_thook', addr, ov) }.returns(String),
-    set_tcall: ->(addr,ov=nil) { Utils::gen_hook_str('set_tcall', addr, ov) }.returns(String),
-    set_tjump: ->(addr,ov=nil) { Utils::gen_hook_str('set_tjump', addr, ov) }.returns(String),
+    add: ->(a,b) { a + b }.returns(Numeric).cacheable,
+    sub: ->(a,b) { a - b }.returns(Numeric).cacheable,
+    mul: ->(a,b) { a * b }.returns(Numeric).cacheable,
+    div: ->(a,b) { a / b }.returns(Numeric).cacheable,
+    mod: ->(a,b) { a % b }.returns(Numeric).cacheable,
+    sin: ->(n) { Math.sin(n) }.returns(Float).cacheable,
+    cos: ->(n) { Math.cos(n) }.returns(Float).cacheable,
+    tan: ->(n) { Math.tan(n) }.returns(Float).cacheable,
+    exp: ->(n) { Math.exp(n) }.returns(Float).cacheable,
+    log: ->(n) { Math.log(n) }.returns(Float).cacheable,
+    sqrt: ->(n) { Math.sqrt(n) }.returns(Float).cacheable,
+
+    over:      ->(addr,ov=nil) { Utils::gen_hook_str('over', addr, ov) }.returns(String).cacheable,
+    hook:      ->(addr,ov=nil) { Utils::gen_hook_str('hook', addr, ov) }.returns(String).cacheable,
+    call:      ->(addr,ov=nil) { Utils::gen_hook_str('call', addr, ov) }.returns(String).cacheable,
+    jump:      ->(addr,ov=nil) { Utils::gen_hook_str('jump', addr, ov) }.returns(String).cacheable,
+    thook:     ->(addr,ov=nil) { Utils::gen_hook_str('thook', addr, ov) }.returns(String).cacheable,
+    tcall:     ->(addr,ov=nil) { Utils::gen_hook_str('tcall', addr, ov) }.returns(String).cacheable,
+    tjump:     ->(addr,ov=nil) { Utils::gen_hook_str('tjump', addr, ov) }.returns(String).cacheable,
+    set_hook:  ->(addr,ov=nil) { Utils::gen_hook_str('set_hook', addr, ov) }.returns(String).cacheable,
+    set_call:  ->(addr,ov=nil) { Utils::gen_hook_str('set_call', addr, ov) }.returns(String).cacheable,
+    set_jump:  ->(addr,ov=nil) { Utils::gen_hook_str('set_jump', addr, ov) }.returns(String).cacheable,
+    set_thook: ->(addr,ov=nil) { Utils::gen_hook_str('set_thook', addr, ov) }.returns(String).cacheable,
+    set_tcall: ->(addr,ov=nil) { Utils::gen_hook_str('set_tcall', addr, ov) }.returns(String).cacheable,
+    set_tjump: ->(addr,ov=nil) { Utils::gen_hook_str('set_tjump', addr, ov) }.returns(String).cacheable,
     repl:      ->(addr,ov_or_asm,asm=nil) do
-      "ncp_repl(#{addr.to_hex}#{',' if ov_or_asm}#{'"' if !asm}#{ov_or_asm}#{asm ? ',' : '"'}#{"\"#{asm}\"" if asm})"
-    end.returns(String)
+      Utils.gen_hook_str('repl', addr, ov_or_asm.is_a?(String) ? nil : ov_or_asm, asm.nil? ? ov_or_asm : asm)
+    end.returns(String).cacheable
   }.freeze
 
 

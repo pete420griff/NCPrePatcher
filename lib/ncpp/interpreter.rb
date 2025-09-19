@@ -5,11 +5,22 @@ require 'fileutils'
 
 module NCPP
 
+  Block = Struct.new(:ast,:interpreter) do
+    def eval
+      result = nil
+      ast.each {|node| result = interpreter.eval_expr(node) }
+      result
+    end
+    def call(_=nil) = eval
+    def return_type = nil
+    def cacheable? = false
+  end
+
   #
   # Evaluates and executes NCPP DSL ASTs
   #
   class Interpreter
-    def initialize(cmd_prefix = COMMAND_PREFIX, extra_cmds = {}, extra_vars = {})
+    def initialize(cmd_prefix = COMMAND_PREFIX, extra_cmds = {}, extra_vars = {}, cmd_cache = {})
       @parser = Parser.new(cmd_prefix: cmd_prefix)
       @transformer = Transformer.new
 
@@ -39,20 +50,12 @@ module NCPP
        .merge(extra_cmds)
 
       @variables = CORE_VARIABLES.merge(extra_vars)
+
+      @command_cache = cmd_cache # TODO
     end
 
     def get_binding
       binding
-    end
-
-    Block = Struct.new(:ast,:interpreter) do
-      def eval
-        result = nil
-        ast.each {|node| result = interpreter.eval_expr(node) }
-        result
-      end
-      def call(_=nil) = eval
-      def return_type = nil
     end
 
     def eval_expr(node)
@@ -180,6 +183,7 @@ module NCPP
               new_line << value.to_s
 
               # puts "#{file_path}:#{lineno+1} expanded #{@COMMAND_PREFIX}..." if verbose
+
               cursor += @COMMAND_PREFIX.length + last_paren # move cursor past command expression
               next
             rescue Parslet::ParseFailed => e

@@ -133,18 +133,22 @@ module Nitro
     def read64(addr)
       codeBin_read64(@ptr, addr)
     end
+    alias_method :read_dword, :read64
 
     def read32(addr)
       codeBin_read32(@ptr, addr)
     end
+    alias_method :read_word, :read32
 
     def read16(addr)
       codeBin_read16(@ptr, addr)
     end
+    alias_method :read_hword, :read16
 
     def read8(addr)
       codeBin_read8(@ptr, addr)
     end
+    alias_method :read_byte, :read8
 
     def size
       codeBin_getSize(@ptr)
@@ -173,28 +177,26 @@ module Nitro
       clamped.step(step).map { |addr| [send(:"read#{step * 8}", addr), addr] }
     end
 
-    def each_word
-      read.each do |word, addr|
+    def each_word(range = bounds)
+      read(range).each do |word, addr|
         yield word, addr
       end
     end
 
-    def each_doubleword
-      read(bounds,8).each do |dword, addr|
-        yield dw, addr
+    def each_dword(range = bounds)
+      read(range,8).each do |dword, addr|
+        yield dword, addr
       end
     end
-    alias_method :each_dword, :each_doubleword
 
-    def each_halfword
-      read(bounds,2).each do |hword, addr|
+    def each_hword(range = bounds)
+      read(range,2).each do |hword, addr|
         yield hword, addr
       end
     end
-    alias_method :each_hword, :each_halfword
 
-    def each_byte
-      read(bounds,1).each do |byte, addr|
+    def each_byte(range = bounds)
+      read(range,1).each do |byte, addr|
         yield byte, addr
       end
     end
@@ -239,7 +241,7 @@ module Nitro
       @id = id
       if [:file_path, :ram_addr, :is_compressed].all? { |k| args.key?(k) }
         @ptr = FFI::AutoPointer.new(overlayBin_alloc, method(:overlayBin_release))
-        if not File.exist? args[:file_path]
+        if !File.exist? args[:file_path]
           puts "Error: #{args[:file_path]} does not exist"
           raise "OverlayBin initialization failed"
         end

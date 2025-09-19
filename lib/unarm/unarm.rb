@@ -454,7 +454,7 @@ module Unarm
 
           addr = parts[1].hex
           next if addr <= 0
-          parts[1] = addr - (addr & 1)
+          parts[1] = addr # - (addr & 1)
           syms[parts[0]] = parts[1]
           if dest
             locs[dest] = Array.new unless locs[dest]
