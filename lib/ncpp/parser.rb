@@ -2,6 +2,9 @@ require 'parslet'
 
 module NCPP
 
+  #
+  # Command parser -- parses raw text into a tree
+  #
   class Parser < Parslet::Parser
 
     def initialize(cmd_prefix: 'ncpp_')
@@ -50,7 +53,7 @@ module NCPP
       chained_command | command | variable | group | float | integer
     end
 
-    rule(:group) { lparen >> expression.as(:group) >> rparen }
+    rule(:group) { lparen >> expression.as(:group) >> rparen >> lbrace.absent? }
 
     rule(:identifier) { digits.absent? >> match['A-Za-z0-9_'].repeat(1) }
 
@@ -67,9 +70,14 @@ module NCPP
       str(@COMMAND_PREFIX).maybe >> identifier.as(:var_name) >> lparen.absent? >> space?
     end
 
-
     rule :block do
-      lbrace >> expression.repeat.as(:block_body) >> rbrace
+      block_args.maybe >> lbrace >> expression.repeat.as(:block_body) >> rbrace
+    end
+
+    rule :block_args do
+      lparen >>
+        (identifier >> (comma >> identifier).repeat).as(:block_args).maybe >>
+      rparen
     end
 
     rule :chained_command do
@@ -132,13 +140,15 @@ module NCPP
 
   end
 
-
+  #
+  # Command transformer -- transforms parsed trees to ASTs
+  #
   class Transformer < Parslet::Transform
     rule(integer: simple(:x)) { Integer(x) }
     rule(float: simple(:x))   { Float(x) }
     rule(string: simple(:s))  { String(s) }
 
-    rule(group: subtree(:g)) { g } # unwrap parentheses
+    rule(group: subtree(:g)) { g }
 
     rule(l: subtree(:lhs), o: simple(:op), r: subtree(:rhs)) do
       { infix: true, lhs: lhs, op: op.to_s, rhs: rhs }
@@ -169,6 +179,20 @@ module NCPP
         else
           [exprs]
         end
+      }
+    end
+
+    rule(block_args: simple(:args), block_body: subtree(:exprs)) do
+      { block: 
+        case exprs
+        when nil
+          []
+        when Array
+          exprs.compact
+        else
+          [exprs]
+        end,
+        args: args.to_s.split(',').map(&:strip)
       }
     end
 

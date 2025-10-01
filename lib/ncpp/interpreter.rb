@@ -5,13 +5,13 @@ require 'fileutils'
 
 module NCPP
 
-  Block = Struct.new(:ast,:interpreter) do
-    def eval
+  Block = Struct.new(:ast,:args,:interpreter) do
+    def eval(argv)
       result = nil
-      ast.each {|node| result = interpreter.eval_expr(node) }
+      ast.each {|node| result = interpreter.eval_expr(node, argv.empty? ? nil : Hash[args.zip(argv)]) }
       result
     end
-    def call(_=nil) = eval
+    def call(*argv) = eval(argv)
     def return_type = nil
     def cacheable? = false
   end
@@ -27,27 +27,23 @@ module NCPP
       @COMMAND_PREFIX = cmd_prefix
 
       # interpreter environment-specific commands
-      @commands = {
+      @commands = CommandRegistry.new({
         ruby: ->(code_str) { eval(code_str, get_binding) },
         call_command: ->(cmd_str, *args) { @commands[cmd_str.to_sym].call(*args) },
-        define_command: ->(name,block) do
+        define_command: ->(name, block) {
           Utils::valid_identifier_check(name)
           @commands[name.to_sym] = block.is_a?(Block) ? block : eval(block, get_binding)
-        end,
-        alias_command: ->(new_name, name) do
+        },
+        alias_command: ->(new_name, name) {
           Utils::valid_identifier_check(name)
           @commands[new_name.to_sym] = @commands[name.to_sym]
-        end,
-        define_variable: ->(name, val) do
+        },
+        define_variable: ->(name, val) {
           Utils::valid_identifier_check(name)
           @variables[name.to_sym] = eval_expr(val)
-        end,
-        alias_variable: ->(new_name, name) do
-          Utils::valid_identifier_check(name)
-          @variables[new_name.to_sym] = @variables[name.to_sym]
-        end
-      }.merge(CORE_COMMANDS)
-       .merge(extra_cmds)
+        }
+      }).merge(CORE_COMMANDS)
+        .merge(extra_cmds)
 
       @variables = CORE_VARIABLES.merge(extra_vars)
 
@@ -58,40 +54,44 @@ module NCPP
       binding
     end
 
-    def eval_expr(node)
+    def eval_expr(node, subs = nil)
       case node
         when Numeric, String
           node
 
         when Hash
           if node[:infix]
-            lhs = eval_expr(node[:lhs])
-            rhs = eval_expr(node[:rhs])
+            lhs = eval_expr(node[:lhs], subs)
+            rhs = eval_expr(node[:rhs], subs)
             lhs.send(node[:op], rhs)
 
           elsif node[:cmd_name] # normal command call
             fn = @commands[node[:cmd_name].to_sym] or raise "Unknown command #{node[:cmd_name]}"
-            args = Array(node[:args]).map { |a| eval_expr(a) }
+            args = Array(node[:args]).map { |a| eval_expr(a, subs) }
             ret = fn.call(*args)
             fn.return_type.nil? ? nil : ret
 
           elsif node[:base] && node[:chain] # chained command call
-            acc = eval_expr(node[:base])
+            acc = eval_expr(node[:base], subs)
             no_ret = false
             node[:chain].each do |link|
               cmd = link[:next]
               fn = @commands[cmd[:cmd_name].to_sym] or raise "Unknown command #{cmd[:cmd_name]}"
-              args = Array(cmd[:args]).map { |a| eval_expr(a) }
+              args = Array(cmd[:args]).map { |a| eval_expr(a, subs) }
               acc = fn.call(acc, *args)
               no_ret = fn.return_type.nil?
             end
             no_ret ? nil : acc
 
           elsif node[:var_name]
+            if !subs.nil?
+              ret = subs[node[:var_name].to_s]
+              return ret unless ret.nil?
+            end
             @variables[node[:var_name].to_sym] or raise "Unknown variable: #{node[:var_name]}"
 
           elsif node[:block]
-            Block.new(node[:block], self)
+            Block.new(node[:block], node[:args], self)
 
           elsif node[:bool]
             eval(node[:bool])
@@ -217,7 +217,9 @@ module NCPP
           next if expr.empty?
 
           parsed_tree = @parser.parse(expr, root: :expression)
+          # puts "Parsed tree: #{parsed_tree.inspect}"
           ast = @transformer.apply(parsed_tree)
+          # puts "Transformed tree: #{ast.inspect}"
           puts eval_expr(ast)
 
         rescue Parslet::ParseFailed => error

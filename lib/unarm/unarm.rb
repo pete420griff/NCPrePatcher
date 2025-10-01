@@ -55,6 +55,8 @@ module UnarmBind
   attach_function :arm_ins_is_data_operation, [:ins_handle], :bool
   attach_function :thumb_ins_is_data_operation, [:ins_handle], :bool
 
+  attach_function :get_sym_for_addr, [:uint32, :symbols_handle, :uint32], :cstr_handle
+
   attach_function :free_arm_ins, [:ins_handle], :void
   attach_function :free_thumb_ins, [:ins_handle], :void
   attach_function :free_ins_args, [:ins_args_handle, :uint32], :void
@@ -397,10 +399,6 @@ module Unarm
   @symbols7 = nil
   @raw_syms = {}
 
-  def self.cpu
-    @cpu
-  end
-
   def self.use_arm9
     @cpu = CPU::ARM9
   end
@@ -409,6 +407,8 @@ module Unarm
     @cpu = CPU::ARM7
   end
 
+  def self.cpu = @cpu
+
   def self.symbols9 = @symbols9
   def self.symbols7 = @symbols7
 
@@ -416,8 +416,49 @@ module Unarm
     @cpu == CPU::ARM9 ? symbols9 : symbols7
   end
 
-  def self.raw_syms
-    @raw_syms
+  def self.raw_syms = @raw_syms
+
+  def self.shitty_demangle(sym)
+    return sym unless sym.start_with?('_Z')
+
+    sym = sym[2..]
+
+    is_vtable = false
+
+    if sym.start_with? 'N'
+      sym = sym[1..]
+
+    elsif sym.start_with? 'NK'
+      sym = sym[2..]
+
+    elsif sym.start_with? 'TV'
+      sym = sym[2..]
+      is_vtable = true
+
+    elsif sym.start_with? 'nw'
+      return 'new'
+
+    elsif sym.start_with? 'na'
+      return 'new[]'
+
+    elsif sym.start_with? 'dl'
+      return 'delete'
+
+    elsif sym.start_with? 'da'
+      return 'delete[]'
+    end
+
+    names = []
+    loop do
+      break if sym.nil? || sym.empty? || !sym[0].match?(/\d/)
+      len_end = sym.index(/\D/)
+      n_len   = Integer(sym[...len_end], exception: false)
+      n       = sym[len_end, n_len]
+      names   << n
+      sym     = sym[len_end + n_len..]
+    end
+
+    names.join('::') + (is_vtable ? '::vtable' : '')
   end
 
   class Symbol < FFI::Struct
@@ -426,7 +467,7 @@ module Unarm
   end
 
   class Symbols
-    attr_reader :map, :locs, :count
+    attr_reader :map, :locs, :count, :demangled_map
 
     def self.load(file_path)
       syms = {} # maps symbol names to their addresses
@@ -484,6 +525,11 @@ module Unarm
       end
 
       @count = @map.length
+
+      @demangled_map = {}
+      @map.each do |sym, _addr|
+        @demangled_map[Unarm.shitty_demangle(sym)] = sym
+      end
     end
 
   end
@@ -562,7 +608,7 @@ module Unarm
     alias_method :str, :string
 
     def eql?(other)
-      string == other.string
+      @raw == other.raw
     end
     alias_method :==, :eql?
 
@@ -578,6 +624,11 @@ module Unarm
       @conditional
     end
     alias_method :conditional?, :is_conditional?
+
+    def is_unconditional?
+      !@conditional
+    end
+    alias_method :unconditional?, :is_unconditional?
 
     def is_data_operation?
       @data_op
@@ -599,11 +650,35 @@ module Unarm
     end
 
     def branch_destination
-      arg = @args.find {|a| a.kind == :branch_dest}
-      raise 'Instruction does not branch' if !arg
-      arg.value
+      arg = @arguments.find {|a| a.kind == :branch_dest}
+      return nil if !arg
+      arg.value + @address
     end
     alias_method :branch_dest, :branch_destination
+
+    def target_address
+      if opcode == :ldr && args[1].kind == :reg && args[1].value.reg == :pc && args[2].kind == :offset_imm
+        address + args[2].value.value + 8
+      else
+        nil
+      end
+    end
+    alias_method :target_addr, :target_address
+
+    def branch_to_register?
+      opcode == :bx ||
+        (mnemonic == 'mov' && args[0].value.reg == :pc) || (mnemonic == 'ldr' && args[0].value.reg == :pc)
+    end
+    alias_method :branch_to_reg?, :branch_to_register?
+
+    # this won't catch everything but I think it's good enough
+    def function_end?
+      return false if conditional?
+
+      branch_to_register? ||
+        (mnemonic == 'pop' && args[1].contains?(:pc)) ||
+        (mnemonic == 'ldm' && args[0].value.reg == :sp && args[1].value.contains?(:pc))
+    end
 
   end
 
@@ -679,7 +754,7 @@ module Unarm
     end
 
     def set_parse_mode(mode)
-      raise ArgumentError, 'mode must be ARM, THUMB, or DATA' unless (Mode::ARM..Mode::Data).include? mode
+      raise ArgumentError, 'mode must be ARM, THUMB, or DATA' unless (Mode::ARM..Mode::DATA).include? mode
       @mode = mode
     end
 
@@ -687,6 +762,56 @@ module Unarm
       set_parse_mode(mode)
       # TODO!!!!!
     end
+
+  end
+
+  class Data
+    include UnarmBind
+
+    attr_reader :raw, :size, :address, :location, :string, :value
+
+    alias_method :addr, :address
+    alias_method :loc, :location
+    alias_method :str, :string
+
+    def get_directive(size)
+      case size
+      when 4
+        '.word'
+      when 2
+        '.hword'
+      when 1
+        '.byte'
+      else
+        raise "Could not determine directive from data size: #{size}"
+      end
+    end
+
+    def initialize(raw, size: 4, addr: 0, loc: Unarm.cpu.to_s, might_be_ptr: true)
+      @raw = raw
+      @address = addr
+      @location = loc
+      if raw.is_a? String
+        @size = raw.length + 1
+        @string = ".asciiz \"#{raw}\""
+      else
+        @size = size
+        if size == 4 && might_be_ptr
+          syms = Unarm.get_raw_syms(loc)
+          raw_str = CStr.new(get_sym_for_addr(raw, syms.ptr, syms.count))
+          value = raw_str.null? ? raw.to_hex : raw_str.to_s
+        else
+          value = raw.to_hex
+        end
+        @string = "#{get_directive(size)} #{value}"
+        @value = value
+      end
+    end
+
+    def eql?(other)
+      @raw == other.raw
+    end
+    alias_method :==, :eql?
 
   end
 

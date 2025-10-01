@@ -12,6 +12,7 @@ module NitroBind
   typedef :pointer, :header_handle
   typedef :pointer, :codebin_handle
   typedef :pointer, :ovte_handle
+  typedef :pointer, :module_params_handle
 
   attach_function :nitroRom_alloc, [], :rom_handle
   attach_function :nitroRom_release, [:rom_handle], :void
@@ -44,6 +45,7 @@ module NitroBind
   attach_function :codeBin_read32, [:codebin_handle, :uint32], :uint32
   attach_function :codeBin_read16, [:codebin_handle, :uint32], :uint16
   attach_function :codeBin_read8, [:codebin_handle, :uint32], :uint8
+  attach_function :codeBin_readCString, [:codebin_handle, :uint32], :string
   attach_function :codeBin_getSize, [:codebin_handle], :uint32
   attach_function :codeBin_getStartAddress, [:codebin_handle], :uint32
 
@@ -51,6 +53,8 @@ module NitroBind
   attach_function :armBin_release, [:codebin_handle], :void
   attach_function :armBin_load, [:codebin_handle, :string, :uint32, :uint32, :uint32, :bool], :bool
   attach_function :armBin_getEntryPointAddress, [:codebin_handle], :uint32
+  attach_function :armBin_getModuleParams, [:codebin_handle], :module_params_handle
+  attach_function :armBin_sanityCheckAddress, [:codebin_handle, :uint32], :bool
 
   attach_function :overlayBin_alloc, [], :codebin_handle
   attach_function :overlayBin_release, [:codebin_handle], :void
@@ -169,7 +173,7 @@ module Nitro
     end
 
     def read(range = bounds, step = 4)
-      raise ArgumentError, 'step must be 1, 2, or 4 (bytes)' unless [1,2,4].include? step
+      raise ArgumentError, 'step must be 1, 2, 4, or 8 (bytes)' unless [1,2,4,8].include? step
       raise ArgumentError, 'range must be a Range' unless range.is_a? Range
 
       clamped = Range.new([range.begin || start_addr, start_addr].max, [range.end || end_addr, end_addr].min)
@@ -201,10 +205,35 @@ module Nitro
       end
     end
 
+    def each_char(range = bounds)
+      each_byte(range) do |char, addr|
+        yield char.chr, addr
+      end
+    end
+
+    def read_cstring(start_addr)
+      codeBin_readCString(@ptr, start_addr)
+    end
+    alias_method :read_cstr, :read_cstring
+
   end
 
   class ArmBin < CodeBin
     include NitroBind
+
+    attr_reader :module_params
+
+    class ModuleParams < FFI::Struct
+      layout :autoload_list_start, :uint32,
+             :autoload_list_end,   :uint32,
+             :autoload_start,      :uint32,
+             :static_bss_start,    :uint32,
+             :static_bss_end,      :uint32,
+             :comp_static_end,     :uint32,
+             :sdk_version_id,      :uint32,
+             :nitro_code_be,       :uint32,
+             :nitro_code_le,       :uint32
+    end
 
     def initialize(args = {})
       if args.has_key? :file_path
@@ -222,6 +251,8 @@ module Nitro
       else
         raise ArgumentError, 'ArmBin must be initialized with a file or a pointer'
       end
+
+      @module_params = ModuleParams.new(armBin_getModuleParams(@ptr))
     end
 
     def entry_point_address
@@ -229,6 +260,11 @@ module Nitro
     end
     alias_method :entry_addr, :entry_point_address
     alias_method :entry_point_addr, :entry_point_address
+
+    def sane_address?(addr)
+      armBin_sanityCheckAddress(@ptr, addr)
+    end
+    alias_method :sane_addr?, :sane_address?
 
   end
 
@@ -359,6 +395,10 @@ module Nitro
 
     def get_file_size(id)
       nitroRom_getFileSize(id)
+    end
+
+    def nitro_sdk_version
+      @arm9.module_params[:sdk_version_id]
     end
 
     def load_overlay(id)

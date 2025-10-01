@@ -217,6 +217,12 @@ module NCPP
     timestamp_cache_path = File.join($config['gen_path'], 'timestamp_cache.json')
     timestamp_cache = File.exist?(timestamp_cache_path) ? JSON.load_file(timestamp_cache_path) : {}
 
+    if timestamp_cache['NCPP_VERSION'] != VERSION
+      timestamp_cache = {}
+    else
+      timestamp_cache.delete('NCPP_VERSION')
+    end
+
     exts = $config['source_file_types'].join(',')
 
     $config['sources'].each do |src|
@@ -280,6 +286,8 @@ module NCPP
 
       CFileInterpreter.new(files, $config['gen_path'], $config['command_prefix'], extra_commands, extra_variables).run
     end
+
+    timestamp_cache['NCPP_VERSION'] = VERSION
 
     FileUtils.mkdir_p(File.dirname(timestamp_cache_path))
     File.write(timestamp_cache_path, JSON.generate(timestamp_cache))
