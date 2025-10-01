@@ -218,7 +218,7 @@ const ArmBin::ModuleParams* ArmBin::getModuleParams() const {
 	return reinterpret_cast<const ModuleParams*>(&((m_bytes.data())[m_moduleParamsOffset]));
 }
 
-constexpr bool ArmBin::sanityCheckAddress(u32 addr) const {
+bool ArmBin::sanityCheckAddress(u32 addr) const {
 	return addr >= m_ramAddr && addr < (m_ramAddr + 0x00400000);
 }
 

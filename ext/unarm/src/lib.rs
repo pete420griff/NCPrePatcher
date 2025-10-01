@@ -406,6 +406,25 @@ make_free_parser_fn!(arm7_free_parser);
 
 
 #[no_mangle]
+pub extern "C" fn get_sym_for_addr(addr: u32, symbols: *const Symbol, symbol_count: u32) -> *mut c_char {
+
+	let slice = SymbolSlice::new(symbols, symbol_count);
+
+	let syms = unarm::Symbols {
+		lookup: &slice,
+		program_counter: addr,
+		pc_load_offset: 0,
+	};
+
+	if let Some(sym_str) = syms.lookup.lookup_symbol_name(0, addr) {
+		let c_str = CString::new(sym_str).expect("CString::new failed");
+		c_str.into_raw()
+	} else {
+		std::ptr::null_mut()
+	}
+}
+
+#[no_mangle]
 pub extern "C" fn free_ins_args(ptr: *mut CArgument, len: usize) {
 	unsafe {
 		if !ptr.is_null() {

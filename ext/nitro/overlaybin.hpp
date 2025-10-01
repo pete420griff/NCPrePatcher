@@ -35,6 +35,8 @@ public:
 	u32 getSize() const override { return static_cast<u32>(m_bytes.size()); }
 	u32 getStartAddress() const override { return m_ramAddress; }
 
+	const void* getPtrToData(u32 address) const override { return &m_bytes[address - m_ramAddress]; }
+
 	[[nodiscard]] constexpr std::vector<u8>& data()						{ return m_bytes; };
 	[[nodiscard]] constexpr const std::vector<u8>& data() const			{ return m_bytes; };
 	[[nodiscard]] constexpr std::vector<u8>& backupData()				{ return m_backupData; };

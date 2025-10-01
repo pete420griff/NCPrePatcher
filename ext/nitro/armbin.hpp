@@ -49,12 +49,14 @@ public:
 	u32 getSize() const override { return static_cast<u32>(m_bytes.size()); }
 	u32 getStartAddress() const override { return m_ramAddr; }
 
+	const void* getPtrToData(u32 address) const override { return &m_bytes[address - m_ramAddr]; }
+
 	void refreshAutoloadData();
 
 	[[nodiscard]] ModuleParams* getModuleParams();
 	[[nodiscard]] const ModuleParams* getModuleParams() const;
 
-	[[nodiscard]] constexpr bool sanityCheckAddress(u32 addr) const;
+	[[nodiscard]] bool sanityCheckAddress(u32 addr) const;
 
 	[[nodiscard]] constexpr u32 getEntryPointAddress() const { return m_entryAddr; }
 

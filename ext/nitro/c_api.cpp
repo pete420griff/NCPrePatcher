@@ -163,6 +163,10 @@ extern "C" {
 		return bin->read<u8>(address);
 	}
 
+	NITRO_API const char* codeBin_readCString(const ICodeBin* bin, u32 address) {
+		return static_cast<const char*>(bin->getPtrToData(address));
+	}
+
 	NITRO_API u32 codeBin_getStartAddress(const ICodeBin* bin) {
 		return bin->getStartAddress();
 	}
@@ -186,6 +190,14 @@ extern "C" {
 
 	NITRO_API u32 armBin_getEntryPointAddress(const ArmBin* arm) {
 		return arm->getEntryPointAddress();
+	}
+
+	NITRO_API const ArmBin::ModuleParams* armBin_getModuleParams(const ArmBin* arm) {
+		return arm->getModuleParams();
+	}
+
+	NITRO_API bool armBin_sanityCheckAddress(const ArmBin* arm, u32 addr) {
+		return arm->sanityCheckAddress(addr);
 	}
 
 

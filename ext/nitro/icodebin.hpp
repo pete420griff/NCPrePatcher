@@ -10,6 +10,7 @@ public:
 	virtual bool writeBytes(u32 address, const void* data, u32 size) = 0;
 	virtual u32 getSize() const = 0;
 	virtual u32 getStartAddress() const = 0;
+	virtual const void* getPtrToData(u32 address) const = 0;
 
 	template<typename T>
 	T read(u32 address) const {
