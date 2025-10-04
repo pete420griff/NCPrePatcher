@@ -33,10 +33,10 @@ LIB_EXT = case
 ROOT = File.expand_path(__dir__) # directory containing build.rb
 
 NITRO_BUILD_PATH = File.join(ROOT, 'nitro/build/')
-NITRO_LIB_NAME = (OS.mac? ? 'libnitro' : 'nitro') + LIB_EXT
+NITRO_LIB_NAME = (OS.unix? ? 'libnitro' : 'nitro') + LIB_EXT
 
 UNARM_BUILD_PATH = File.join(ROOT, 'unarm/')
-UNARM_LIB_NAME = (OS.mac? ? 'libunarm_c' : 'unarm_c') + LIB_EXT
+UNARM_LIB_NAME = (OS.unix? ? 'libunarm_c' : 'unarm_c') + LIB_EXT
 
 def config_nitro
   # Create build folder if it doesn't exist

@@ -185,7 +185,7 @@ module NCPP
         quiet = true
       end
 
-      opts.on('--remove', '--clean', '--kys', 'Removes any trace of my existence from your project') do
+      opts.on('--remove', '--clean', '--kys', 'Removes NCPrePatcher from your project') do
         clean
         exit
       end
