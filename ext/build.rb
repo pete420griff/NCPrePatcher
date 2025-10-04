@@ -29,10 +29,10 @@ LIB_EXT = case
             '.so'
           end
 
-NITRO_BUILD_PATH = 'nitro/build/'
+NITRO_BUILD_PATH = './nitro/build/'
 NITRO_LIB_NAME = (OS.mac? ? 'libnitro' : 'nitro') + LIB_EXT
 
-UNARM_BUILD_PATH = 'unarm/'
+UNARM_BUILD_PATH = './unarm/'
 UNARM_LIB_NAME = (OS.mac? ? 'libunarm_c' : 'unarm_c') + LIB_EXT
 
 def config_nitro
