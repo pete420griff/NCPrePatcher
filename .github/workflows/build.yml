@@ -1,14 +1,11 @@
-name: Build ext libs
+name: Build
 
 on:
   push:
     branches: [ master ]
-    paths:
-      - 'ext/**'
+
   pull_request:
     branches: [ master ]
-    paths:
-      - 'ext/**'
 
 jobs:
   build:
@@ -48,9 +45,15 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --yes
-          choco install llvm --yes
-          choco install strawberryperl --yes
-          # MSVC compiler is already available in the runnerg
 
       - name: Run build script
         run: ruby ext/build.rb
+
+      -name: Build gem
+        run: gem build ncpp.gemspec
+
+      - name: Upload gem artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gem-${{ matrix.os }}
+          path: "*.gem"
