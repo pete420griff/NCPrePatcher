@@ -2,6 +2,3 @@
 
 require_relative '../lib/ncpp.rb'
 NCPP.run(ARGV)
-
-require 'irb'
-IRB.start(__FILE__)

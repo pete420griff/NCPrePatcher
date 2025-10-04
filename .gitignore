@@ -16,6 +16,7 @@ ext/unarm/target/
 !/lib/
 /lib/*/*
 !/lib/*/*.rb
+!/.github/
 !Gemfile
 !Gemfile.lock
 !*.gemspec
