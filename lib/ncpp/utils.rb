@@ -3,6 +3,18 @@ require_relative '../unarm/unarm.rb'
 
 module NCPP
   module Utils
+
+    DATA_TYPES = [
+      { size: 8, signed: false },
+      { size: 4, signed: false },
+      { size: 2, signed: false },
+      { size: 1, signed: false },
+      { size: 8, signed: true  },
+      { size: 4, signed: true  },
+      { size: 2, signed: true  },
+      { size: 1, signed: true  }
+    ].freeze
+
     def self.valid_identifier_check(name) # checks if given name is a valid command/variable identifier
       raise "Invalid identifier: #{name}" unless name.start_with?(/[A-Za-z_]/)
     end
@@ -17,17 +29,21 @@ module NCPP
       if sym.start_with? '_Z'
         Unarm.sym_map[sym]
       else
-        sym_to_addr(Unarm.symbols.demangled_map[sym])
+        demangled = Unarm.symbols.demangled_map[sym]
+        raise "#{sym} is not a valid symbol" if demangled.nil?
+        Unarm.sym_map[demangled]
       end
     end
 
     def self.get_sym_ov(sym)
+      sym = Unarm.symbols.demangled_map[sym] unless sym.start_with?('_Z')
       Integer(Unarm.symbols.locs.find {|k,v| v.include? sym}[0][2..], exception: false)
     end
 
     def self.resolve_loc(addr, ov)
       if addr.is_a? String
         addr = Unarm.symbols.demangled_map[addr] unless addr.start_with?('_Z')
+        raise "Not a valid symbol" if addr.nil?
         ov = get_sym_ov(addr) if ov.nil?
         addr = sym_to_addr(addr)
       end
@@ -36,7 +52,7 @@ module NCPP
 
     def self.resolve_code_loc(addr, ov)
       addr, ov = resolve_loc(addr, ov)
-      [addr, ov, ov.nil? ? $rom.arm9 : $rom.get_overlay(ov)]
+      [addr, ov, ov.nil? || ov == -1 ? $rom.arm9 : $rom.get_overlay(ov)]
     end
 
     def self.gen_hook_str(type, addr, ov=nil, asm=nil) # generates an NCPatcher hook
@@ -49,6 +65,14 @@ module NCPP
       code_bin.reloc_func(addr)
     end
 
+    def self.get_instruction(addr, ov = nil)
+      addr, ov, code_bin = resolve_code_loc(addr, ov)
+      if addr & 1 != 0
+        code_bin.read_thumb_instruction(addr-1)
+      else
+        code_bin.read_arm_instruction(addr)
+      end
+    end
     def self.get_dword(addr, ov = nil)
       addr, ov, code_bin = resolve_code_loc(addr, ov)
       code_bin.read_dword(addr).unsigned(64)
@@ -93,6 +117,26 @@ module NCPP
       addr, ov, code_bin = resolve_code_loc(addr, ov)
       code_bin.read_byte(addr).signed(8)
     end
+
+    def self.get_cstring(addr, ov = nil)
+      addr, ov, code_bin = resolve_code_loc(addr, ov)
+      code_bin.read_cstr(addr)
+    end
+
+    def self.get_array(addr, ov, element_type_id, element_count)
+      element_size = DATA_TYPES[element_type_id][:size]
+      element_signed = DATA_TYPES[element_type_id][:signed]
+      raise ArgumentError, 'element size must be 1, 2, 4, or 8 (bytes)' unless [1,2,4,8].include?(element_size)
+      addr, ov, code_bin = resolve_code_loc(addr, ov)
+      (0...element_count).map do |i|
+        offset = addr + i * element_size
+        if element_signed
+          code_bin.send(:"read#{element_size * 8}", offset).signed(element_size*8)
+        else
+          code_bin.send(:"read#{element_size * 8}", offset)
+        end
+      end
+    end
   end
 end
 
@@ -109,7 +153,6 @@ class Integer
     n = self & mask
     sign_bit = 1 << (bits - 1)
     n >= sign_bit ? n - (1 << bits) : n
-    n
   end
 
   def unsigned(bits)
@@ -181,7 +224,7 @@ class Nitro::CodeBin
     pool = []
 
     send(:"each_#{is_thumb ? 'thumb' : 'arm'}_ins", addr..) do |ins|
-      raise "Illegal instruction found at #{ins.addr}; this is likely not a function." if ins.illegal?
+      raise "Illegal instruction found at #{ins.addr.to_hex}; this is likely not a function." if ins.illegal?
       
       if target = ins.target_addr
         pool << Unarm::Data.new(read_word(target), addr: target, loc: get_loc)

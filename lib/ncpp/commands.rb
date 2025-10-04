@@ -20,7 +20,7 @@ module NCPP
   end
 
   CORE_COMMANDS = CommandRegistry.new({
-    put: ->(x) { String(x) }.returns(String),
+    null: -> (*_) {},
 
     if: ->(out,cond) { cond ? (out.is_a?(Block) ? out.call : out) : nil }.returns(Object),
 
@@ -32,28 +32,41 @@ module NCPP
       out.nil? ? (alt_out.is_a?(Block) ? alt_out.call : alt_out) : (out.is_a?(Block) ? out.call : out)
     }.returns(Object),
 
-    then: ->(_, block, *args) {
+    then: ->(arg, block, *args) {
       raise "then expects a block" unless block.is_a?(Block)
-      block.call(*args)
-    },
+      if block.args.nil?
+        block.call
+      elsif arg.nil?
+        block.call(*args)
+      else
+        block.call(arg, *args)
+      end
+    }.returns(Object),
 
     do: ->(block, *args) {
       raise "do expects a block" unless block.is_a?(Block)
       block.call(*args)
-    },
+    }.returns(Object),
 
-    repeat: ->(block, count) {
+    repeat: ->(block, count, *args) {
       raise "repeat expects a block" unless block.is_a?(Block)
-      count.to_i.times { block.call }
+      if block.args.nil?
+        count.to_i.times { block.call }
+      else
+        count.to_i.times { |i| block.call(i, *args) } # make this a separate command?
+      end
     },
 
-    console_log: ->(msg, add_newline=true) {
+    print: ->(msg, add_newline=true) {
       if add_newline
         puts msg
       else
         print msg
       end
     },
+
+    warn: ->(msg) { warn "WARNING: #{msg}" },
+    error: ->(msg) { raise msg },
 
     float: ->(n) { Float(n) }.returns(Float).cacheable,
     int: ->(n) { Integer(n) }.returns(Integer).cacheable,
@@ -68,6 +81,10 @@ module NCPP
     strlen: ->(s) { s.length }.returns(Integer).cacheable,
     upcase:   ->(str) { str.upcase }.returns(String).cacheable,
     downcase: ->(str) { str.downcase }.returns(String).cacheable,
+    concat: ->(s1,s2) { s1.to_s + s2.to_s }.returns(String).cacheable,
+    str_literal: ->(str) { '"' + str.to_s + '"' }.returns(String).cacheable,
+    raw_str_literal: ->(str) { 'R"(' + "\n" + str.to_s + ')"' }.returns(String).cacheable,
+    add_newline: ->(str) { str.to_s + "\n" }.returns(String).cacheable,
 
     year:  -> { Time.now.year }.returns(Integer),
     month: -> { Time.now.month }.returns(Integer),
@@ -112,8 +129,10 @@ module NCPP
     addr_to_sym: ->(addr,ov=nil) { Utils::addr_to_sym(addr, ov) }.returns(String).cacheable,
     sym_to_addr: ->(sym) { Utils::sym_to_addr(sym) }.returns(Integer).cacheable,
     get_sym_ov: ->(sym) { Utils::get_sym_ov(sym) }.returns(Integer).cacheable,
+    sym_from_index: ->(idx) { Unarm.sym_map.to_a[idx][0] }.returns(String).cacheable,
 
     get_function: ->(addr,ov=nil) { Utils::reloc_func(addr, ov) }.returns(String).cacheable,
+    get_instruction: ->(addr,ov=nil) { Utils::get_instruction(addr, ov).str }.returns(String).cacheable,
     get_dword: ->(addr,ov=nil) { Utils::get_dword(addr,ov) }.returns(Integer).cacheable,
     get_word:  ->(addr,ov=nil) { Utils::get_word(addr,ov) }.returns(Integer).cacheable,
     get_hword: ->(addr,ov=nil) { Utils::get_hword(addr,ov) }.returns(Integer).cacheable,
@@ -121,35 +140,51 @@ module NCPP
     get_signed_dword: ->(addr,ov=nil) { Utils::get_signed_dword(addr,ov) }.returns(Integer).cacheable,
     get_signed_word:  ->(addr,ov=nil) { Utils::get_signed_word(addr,ov) }.returns(Integer).cacheable,
     get_signed_hword: ->(addr,ov=nil) { Utils::get_signed_hword(addr,ov) }.returns(Integer).cacheable,
-    get_signed_byte:  ->(addr,ov=nil) { Utils::get_signed_byte(addr,ov) }.returns(Integer).cacheable
+    get_signed_byte:  ->(addr,ov=nil) { Utils::get_signed_byte(addr,ov) }.returns(Integer).cacheable,
+    get_cstring: ->(addr,ov=nil) { Utils::get_cstring(addr,ov) }.returns(String).cacheable,
+    get_array: ->(addr,ov,e_type_id,e_count=1) { Utils::get_array(addr,ov,e_type_id,e_count) }.returns(Array).cacheable
 
   },
 
   aliases: {
-    out:       :put,
     eql:       :equal,
     str:       :string,
     upper:     :upcase,
     lower:     :downcase,
+    quoted:    :str_literal,
     minute:    :min,
     second:    :sec,
     get_func:  :get_function,
-    copy_func: :get_function,
+    get_ins:   :get_instruction,
     get_u64:   :get_dword,
     get_s64:   :get_signed_dword,
     get_u32:   :get_word,
     get_s32:   :get_word,
+    get_int:   :get_word,
     get_u16:   :get_hword,
     get_s16:   :get_signed_hword,
     get_u8:    :get_byte,
-    get_s8:    :get_signed_byte
+    get_s8:    :get_signed_byte,
+    get_cstr:  :get_cstring
   }).freeze
 
 
   CORE_VARIABLES = {
     NCPP_VERSION: VERSION,
     BUILD_DATE: Time.now.to_s,
-    PI: Math::PI
+    PI: Math::PI,
+    u64:  0,
+    u32:  1,
+    u16:  2,
+    u8:   3,
+    s64:  4,
+    s32:  5,
+    fx32: 5,
+    s16:  6,
+    fx16: 6,
+    s8:   7,
+    ARM9: -1,
+    ARM7: -1
   }.freeze
 
 end

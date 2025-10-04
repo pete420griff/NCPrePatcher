@@ -8,11 +8,11 @@ module NCPP
   Block = Struct.new(:ast,:args,:interpreter) do
     def eval(argv)
       result = nil
-      ast.each {|node| result = interpreter.eval_expr(node, argv.empty? ? nil : Hash[args.zip(argv)]) }
+      ast.each {|node| result = interpreter.eval_expr(node, argv.empty? || args.nil? ? nil : Hash[args.zip(argv)]) }
       result
     end
     def call(*argv) = eval(argv)
-    def return_type = nil
+    def return_type = Object
     def cacheable? = false
   end
 
@@ -28,8 +28,16 @@ module NCPP
 
       # interpreter environment-specific commands
       @commands = CommandRegistry.new({
+        put: ->(x, new_line=true) {
+          x = x.to_s.gsub!('[','{').gsub!(']','}') if x.is_a? Array
+          if new_line
+            @out_stack << String(x)
+          else
+            @out_stack[-1] << String(x)
+          end
+        },
         ruby: ->(code_str) { eval(code_str, get_binding) },
-        call_command: ->(cmd_str, *args) { @commands[cmd_str.to_sym].call(*args) },
+        do_command: ->(cmd_str, *args) { @commands[cmd_str.to_sym].call(*args) }.returns(Object),
         define_command: ->(name, block) {
           Utils::valid_identifier_check(name)
           @commands[name.to_sym] = block.is_a?(Block) ? block : eval(block, get_binding)
@@ -41,13 +49,52 @@ module NCPP
         define_variable: ->(name, val) {
           Utils::valid_identifier_check(name)
           @variables[name.to_sym] = eval_expr(val)
-        }
+        },
+
+        embed: ->(filename, newline_steps=nil) {
+          dir = File.dirname(@current_file || Dir.pwd)
+          path = File.expand_path(filename, dir)
+          raise "File not found: #{path}" unless File.exist? path
+          File.binread(path).bytes.join(',')
+        }.returns(String),
+
+        embed_hex: ->(filename, newline_steps=nil) {
+          dir = File.dirname(@current_file || Dir.pwd)
+          path = File.expand_path(filename, dir)
+          raise "File not found: #{path}" unless File.exist? path
+          bytes = File.binread(path).bytes
+          bytes.map! {|b| b.to_i.to_hex }.join(',')
+        }.returns(String),
+
+        include: ->(filename) {
+          dir = File.dirname(@current_file || Dir.pwd)
+          path = File.expand_path(filename, dir)
+          raise "File not found: #{path}" unless File.exist? path
+          File.read(path)
+        }.returns(String)
+      },
+
+      aliases: {
+        out:        :put,
+        do_cmd:     :do_command,
+        define_cmd: :define_command,
+        alias_cmd:  :alias_command,
+        define_var: :define_variable
+
       }).merge(CORE_COMMANDS)
         .merge(extra_cmds)
 
-      @variables = CORE_VARIABLES.merge(extra_vars)
+      @variables = {
+        SYMBOL_COUNT: Unarm.symbols.count,
+        GAME_TITLE: $rom.header.game_title,
+        NITRO_SDK_VERSION: $rom.nitro_sdk_version,
+      }.merge(CORE_VARIABLES)
+       .merge(extra_vars)
 
       @command_cache = cmd_cache # TODO
+
+      @out_stack = []
+      @current_file = nil
     end
 
     def get_binding
@@ -66,20 +113,20 @@ module NCPP
             lhs.send(node[:op], rhs)
 
           elsif node[:cmd_name] # normal command call
-            fn = @commands[node[:cmd_name].to_sym] or raise "Unknown command #{node[:cmd_name]}"
+            cmd = @commands[node[:cmd_name].to_sym] or raise "Unknown command #{node[:cmd_name]}"
             args = Array(node[:args]).map { |a| eval_expr(a, subs) }
-            ret = fn.call(*args)
-            fn.return_type.nil? ? nil : ret
+            ret = cmd.call(*args)
+            cmd.return_type.nil? ? nil : ret
 
           elsif node[:base] && node[:chain] # chained command call
             acc = eval_expr(node[:base], subs)
             no_ret = false
             node[:chain].each do |link|
-              cmd = link[:next]
-              fn = @commands[cmd[:cmd_name].to_sym] or raise "Unknown command #{cmd[:cmd_name]}"
-              args = Array(cmd[:args]).map { |a| eval_expr(a, subs) }
-              acc = fn.call(acc, *args)
-              no_ret = fn.return_type.nil?
+              next_cmd = link[:next]
+              cmd = @commands[next_cmd[:cmd_name].to_sym] or raise "Unknown command #{next_cmd[:cmd_name]}"
+              args = Array(next_cmd[:args]).map { |a| eval_expr(a, subs) }
+              acc = cmd.call(acc, *args)
+              no_ret = cmd.return_type.nil?
             end
             no_ret ? nil : acc
 
@@ -124,6 +171,8 @@ module NCPP
     def process_file(file_path, verbose: true)
       raise "#{file_path} does not exist." unless File.exist?(file_path)
 
+      @current_file = file_path
+
       puts "Processing #{file_path}" if verbose
 
       new_file_path = @out_path + '/' + file_path
@@ -132,7 +181,7 @@ module NCPP
       in_comment = false
       in_string  = false
 
-      output = []
+      output = ''
 
       File.readlines(file_path).each_with_index do |line, lineno|
         cursor   = 0
@@ -174,13 +223,14 @@ module NCPP
               tree    = @parser.parse(expr_src)
               rtree_s = tree.to_s.reverse
 
-              # EXTREMELY HACKY BUT FOR NOW FUCK IT I DON'T CARE I DON'T CARE I DON'T CARE NO ONE CAN MAKE ME CARE
-              # (finds the end of the expression)
+              # finds the end of the expression (hacky)
               last_paren = Integer(/\d+/.match(rtree_s[..rtree_s.index('__outer_paren__: '.reverse)].reverse).to_s) + 1
 
               ast = @transformer.apply(tree)
               value = eval_expr(ast)
-              new_line << value.to_s
+              @out_stack << value.to_s unless value.nil?
+              new_line << @out_stack.join("\n") unless @out_stack.empty?
+              @out_stack.clear
 
               # puts "#{file_path}:#{lineno+1} expanded #{@COMMAND_PREFIX}..." if verbose
 
@@ -197,11 +247,11 @@ module NCPP
           cursor += 1
         end
 
-        output << new_line unless line != new_line && /$\s*^/.match?(new_line)
+        output << new_line unless line != new_line && new_line.strip.empty?
       end
 
       FileUtils.mkdir_p(File.dirname(new_file_path))
-      File.write(new_file_path, output.join)
+      File.write(new_file_path, output)
     end
   end
 
@@ -220,7 +270,10 @@ module NCPP
           # puts "Parsed tree: #{parsed_tree.inspect}"
           ast = @transformer.apply(parsed_tree)
           # puts "Transformed tree: #{ast.inspect}"
-          puts eval_expr(ast)
+          out = eval_expr(ast)
+          @out_stack << out unless out.nil?
+          puts @out_stack.join("\n")
+          @out_stack.clear
 
         rescue Parslet::ParseFailed => error
           puts "ERROR: " + error.parse_failure_cause.ascii_tree.to_s
