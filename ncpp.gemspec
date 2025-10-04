@@ -13,8 +13,8 @@ Gem::Specification.new do |spec|
 
   spec.metadata = { "source_code_uri" => "https://github.com/pete420griff/NCPrePatcher" }
 
-  sepc.add_dependency 'ffi', '~> 1.17', '>= 1.17.2'
-  sepc.add_dependency 'parslet', '~> 2.0'
+  spec.add_dependency 'ffi', '~> 1.17', '>= 1.17.2'
+  spec.add_dependency 'parslet', '~> 2.0'
 
   # Specifies which files should be added to the gem when it is released.
   spec.files = Dir.glob(%w[LICENSE.txt README.md {exe,lib,example}/**/*]).reject { |f| File.directory?(f) }
@@ -23,3 +23,4 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
 end
+
