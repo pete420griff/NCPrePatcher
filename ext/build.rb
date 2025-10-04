@@ -37,7 +37,7 @@ UNARM_LIB_NAME = (OS.mac? ? 'libunarm_c' : 'unarm_c') + LIB_EXT
 
 def config_nitro
   # Create build folder if it doesn't exist
-  Dir.mkdir(NITRO_BUILD_PATH) unless Dir.exist? NITRO_BUILD_PATH
+  FileUtils.mkdir_p(NITRO_BUILD_PATH) unless Dir.exist? NITRO_BUILD_PATH
   # Configure CMake
   Dir.chdir(NITRO_BUILD_PATH) do
     out, status = Open3.capture2e('cmake', '..')
