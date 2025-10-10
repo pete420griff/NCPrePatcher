@@ -6,7 +6,7 @@ A preprocessor for [NCPatcher](https://github.com/TheGameratorT/NCPatcher) with 
 
 #### Requirements
 
-- [Ruby (≥ 3.4 recommended)](https://www.ruby-lang.org/en/news/2024/12/25/ruby-3-4-0-released/)
+- [Ruby (≥ 3.4 required)](https://www.ruby-lang.org/en/downloads/)
 
 Go to Releases, download the .gem file for your platform, then open up the command line where it was downloaded to and enter:
 ```console
@@ -28,15 +28,34 @@ For the latter, navigate to an existing project using NCPatcher (where an `ncpat
 ```console
 ncpp
 ```
+It will be installed into your project. Subsequently, running `ncpp` manually is no longer required, it runs when NCPatcher does.
 
 To view what else it can do, run:
 ```console
 ncpp --help
 ```
 
+## Building
+
+#### Requirements
+
+- Ruby
+- CMake and a modern C++ compiler
+- Rust and Cargo
+
+To build the required native libraries, go to /ext/ and run:
+```console
+ruby build.rb
+```
+
+Then go back to the base directory and run:
+```console
+gem build ncpp.gemspec
+```
+
 ## Credits
 
 - Code from NCPatcher used by the **nitro** library
 - [unarm](https://github.com/AetiasHax/unarm) used for disassembling
-- [Ruby-FFI](https://github.com/ffi/ffi) used for binding the libraries above to Ruby
+- [Ruby-FFI](https://github.com/ffi/ffi) used for binding the above libraries to Ruby
 - [Parslet](https://github.com/kschiess/parslet) used for parsing the DSL
