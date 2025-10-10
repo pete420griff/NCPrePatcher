@@ -44,7 +44,7 @@ module NCPP
       if addr.is_a? String
         addr = Unarm.symbols.demangled_map[addr] unless addr.start_with?('_Z')
         raise "Not a valid symbol" if addr.nil?
-        ov = get_sym_ov(addr) if ov.nil?
+        ov = get_sym_ov(addr) if ov != -1 && ov.nil?
         addr = sym_to_addr(addr)
       end
       [addr, ov]
@@ -88,9 +88,9 @@ module NCPP
       code_bin.read_hword(addr).unsigned(16)
     end
 
-    def self.get_signed_byte(addr, ov = nil)
+    def self.get_byte(addr, ov = nil)
       addr, ov, code_bin = resolve_code_loc(addr, ov)
-      code_bin.read_byte(addr).signed(8)
+      code_bin.read_byte(addr).unsigned(8)
     end
 
     def self.get_signed_dword(addr, ov = nil)
@@ -106,11 +106,6 @@ module NCPP
     def self.get_signed_hword(addr, ov = nil)
       addr, ov, code_bin = resolve_code_loc(addr, ov)
       code_bin.read_hword(addr).signed(16)
-    end
-
-    def self.get_byte(addr, ov = nil)
-      addr, ov, code_bin = resolve_code_loc(addr, ov)
-      code_bin.read_byte(addr).unsigned(8)
     end
 
     def self.get_signed_byte(addr, ov = nil)
@@ -136,6 +131,46 @@ module NCPP
           code_bin.send(:"read#{element_size * 8}", offset)
         end
       end
+    end
+
+    def self.find_first_branch_to(branch_dest, start_loc, start_ov=nil)
+      start_addr, _ov, code_bin = resolve_code_loc(start_loc, start_ov)
+      branch_dest = sym_to_addr(branch_dest) if branch_dest.is_a? String
+      code_bin.each_ins(start_addr..) { |ins| return ins.addr if ins.branch_dest == branch_dest }
+      raise "Could not find a branch to #{branch_dest.to_hex}"
+    end
+
+    def self.next_addr(current_loc, ov = nil)
+      addr, ov, code_bin = resolve_code_loc(current_loc,ov)
+      is_thumb = addr & 1 != 0
+      addr -= 1 if is_thumb
+      addr += is_thumb ? 2 : 4
+    end
+
+    def self.get_ins_mnemonic(loc, ov = nil)
+      addr, ov, code_bin = resolve_code_loc(loc,ov)
+      code_bin.read_ins(addr).mnemonic
+    end
+
+    def self.get_ins_arg(loc, ov, arg_index)
+      addr, ov, code_bin = resolve_code_loc(loc,ov)
+      code_bin.read_ins(addr).args[arg_index]
+    end
+
+    def self.to_c_array(arr)
+      arr.to_s.gsub!('[','{').gsub!(']','}')
+    end
+
+    class << self
+      alias_method :get_u64, :get_dword
+      alias_method :get_u32, :get_word
+      alias_method :get_u16, :get_hword
+      alias_method :get_u8, :get_byte
+      alias_method :get_s64, :get_signed_dword
+      alias_method :get_s32, :get_signed_word
+      alias_method :get_s16, :get_signed_hword
+      alias_method :get_s8, :get_signed_byte
+      alias_method :get_cstr, :get_cstring
     end
   end
 end

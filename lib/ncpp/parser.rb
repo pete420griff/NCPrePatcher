@@ -3,7 +3,7 @@ require 'parslet'
 module NCPP
 
   #
-  # Command parser -- parses raw text into a tree
+  # Parses raw text into a tree
   #
   class Parser < Parslet::Parser
 
@@ -29,7 +29,7 @@ module NCPP
 
 
     rule :body do
-      float | integer | string | boolean | command | block
+      float | integer | boolean | null | string | command | block | array | variable
     end
 
     rule :binary_operation do
@@ -43,17 +43,20 @@ module NCPP
         [str('&'),            3, :left], # bitwise AND
         [str('^'),            2, :left], # bitwise XOR
         [str('|'),            1, :left]  # bitwise OR
-      ) | infix_expression(spaced(string | chained_command),
-          [str('+')|str('<<')| # string concatenation
-           str('==')|str('!='), # string comparison
-           1, :left])
+      ) | 
+      infix_expression(spaced(string | chained_command),
+        [str('*'), 2, :left], # string multiplication
+        [str('+')|str('<<')|  # string concatenation
+         str('==')|str('!='), # string comparison
+         1, :left]
+      )
     end
 
     rule :primary do
       chained_command | command | variable | group | float | integer
     end
 
-    rule(:group) { lparen >> expression.as(:group) >> rparen >> lbrace.absent? }
+    rule(:group) { lparen >> (expression | str('')).as(:group) >> rparen >> lbrace.absent? }
 
     rule(:identifier) { digits.absent? >> match['A-Za-z0-9_'].repeat(1) }
 
@@ -61,17 +64,19 @@ module NCPP
       str(@COMMAND_PREFIX).maybe >> identifier.as(:cmd_name) >>
         lparen >>
           (expression >> (comma >> expression).repeat).repeat.as(:args) >>
-        rparen.as(:__outer_paren__)
+        rparen.as(:__last_char__) >> subscript.maybe
     end
     
     rule(:boolean) { (str('true') | str('false')).as(:bool) }
 
+    rule(:null) { str('nil').as(:nil) }
+
     rule :variable do
-      str(@COMMAND_PREFIX).maybe >> identifier.as(:var_name) >> lparen.absent? >> space?
+      str(@COMMAND_PREFIX).maybe >> identifier.as(:var_name) >> lparen.absent? >> subscript.maybe
     end
 
     rule :block do
-      block_args.maybe >> lbrace >> expression.repeat.as(:block_body) >> rbrace
+      block_args.maybe >> lbrace >> expression.repeat.as(:block_body) >> rbrace >> subscript.maybe
     end
 
     rule :block_args do
@@ -80,11 +85,20 @@ module NCPP
       rparen
     end
 
-    rule :chained_command do
-      (command|boolean|variable|group|block|float|integer|string).as(:base) >>
-        (str('.') >> command.as(:next)).repeat.as(:chain)
+    rule :array do
+      lbracket >>
+        (expression >> (comma >> expression).repeat).maybe.as(:array) >>
+      rbracket >> subscript.maybe
     end
 
+    rule :chained_command do
+      (command|boolean|null|variable|group|block|array|float|integer|string).as(:base) >>
+        (str('.') >> command.as(:next)).repeat.as(:chain) >> subscript.maybe
+    end
+
+    rule :subscript do
+      lbracket >> expression.as(:subscript_idx) >> rbracket
+    end
 
     rule(:space) { match['\s'].repeat(1) }
     rule(:space?) { space.maybe }
@@ -98,6 +112,8 @@ module NCPP
     rule(:rparen)  { spaced(str(')')) }
     rule(:lbrace)  { spaced(str('{')) }
     rule(:rbrace)  { spaced(str('}')) }
+    rule(:lbracket) { spaced(str('[')) }
+    rule(:rbracket) { spaced(str(']')) }
     rule(:newline) { str("\n") >> str("\r").maybe }
     rule(:eol)    { str("\n") | any.absent? }
     rule(:digit)  { match['0-9'] }
@@ -108,8 +124,7 @@ module NCPP
     rule(:bin_digits) { bin_digit.repeat(1) }
 
     rule :float do
-      (
-        str('-').maybe >>
+      (str('-').maybe >>
         digits.maybe >>
         (
           (
@@ -133,20 +148,34 @@ module NCPP
     end
 
     rule :string do
-      str('"') >> (
+      (str('"') >> (
         str('\\') >> any | str('"').absent? >> any
-      ).repeat.as(:string) >> str('"')
+      ).repeat.as(:string) >> str('"')) |
+      (str("'") >> (
+        str('\\') >> any | str("'").absent? >> any
+      ).repeat.as(:string) >> str("'")) >> subscript.maybe
     end
 
   end
 
   #
-  # Command transformer -- transforms parsed trees to ASTs
+  # Transforms parsed trees to ASTs
   #
   class Transformer < Parslet::Transform
     rule(integer: simple(:x)) { Integer(x) }
     rule(float: simple(:x))   { Float(x) }
     rule(string: simple(:s))  { String(s) }
+    rule(string: sequence(:s)) { '' }
+
+    rule(array: subtree(:a)) do
+      { array:
+        case a
+        when nil then []
+        when Array then a
+        else [a]
+        end
+      }
+    end
 
     rule(group: subtree(:g)) { g }
 

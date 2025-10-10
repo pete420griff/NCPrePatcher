@@ -22,6 +22,8 @@ module NCPP
   CORE_COMMANDS = CommandRegistry.new({
     null: -> (*_) {},
 
+    place: ->(arg) { arg }.returns(Object),
+
     if: ->(out,cond) { cond ? (out.is_a?(Block) ? out.call : out) : nil }.returns(Object),
 
     elsif: ->(out, cond, alt_out) {
@@ -86,6 +88,9 @@ module NCPP
     raw_str_literal: ->(str) { 'R"(' + "\n" + str.to_s + ')"' }.returns(String).cacheable,
     add_newline: ->(str) { str.to_s + "\n" }.returns(String).cacheable,
 
+    array: ->(*args) { Array([*args]) }.returns(Array).cacheable,
+    to_c_array: ->(arr) { Utils::to_c_array(arr) }.returns(String).cacheable,
+
     year:  -> { Time.now.year }.returns(Integer),
     month: -> { Time.now.month }.returns(Integer),
     day:   -> { Time.now.day }.returns(Integer),
@@ -142,30 +147,44 @@ module NCPP
     get_signed_hword: ->(addr,ov=nil) { Utils::get_signed_hword(addr,ov) }.returns(Integer).cacheable,
     get_signed_byte:  ->(addr,ov=nil) { Utils::get_signed_byte(addr,ov) }.returns(Integer).cacheable,
     get_cstring: ->(addr,ov=nil) { Utils::get_cstring(addr,ov) }.returns(String).cacheable,
-    get_array: ->(addr,ov,e_type_id,e_count=1) { Utils::get_array(addr,ov,e_type_id,e_count) }.returns(Array).cacheable
+    get_array: ->(addr,ov,e_type_id,e_count=1) { Utils::get_array(addr,ov,e_type_id,e_count) }.returns(Array).cacheable,
+    get_c_array: ->(addr,ov,e_type_id,e_count=1) {
+      Utils::to_c_array(Utils::get_array(addr,ov,e_type_id,e_count))
+    }.returns(Array).cacheable,
+
+    find_first_branch_to: ->(branch_dest, start_loc, start_ov=nil) {
+      Utils::find_first_branch_to(branch_dest, start_loc,start_ov)
+    }.returns(Integer).cacheable,
+
+    next_addr: ->(current_addr,ov=nil) { Utils::next_addr(current_addr,ov) }.returns(Integer).cacheable,
+
+    get_ins_mnemonic: ->(loc,ov=nil) { Utils::get_ins_mnemonic(loc,ov) }.returns(String).cacheable,
+    get_ins_arg: ->(loc,ov,arg_index) { Utils::get_ins_arg(loc,ov,arg_index) }.returns(String).cacheable
+    # get_ins_branch_dest: ->(loc,ov=nil) {}.returns(Integer).cacheable,
+    # get_ins_target_addr: ->(loc,ov=nil) {}.returns(Integer).cacheable
 
   },
 
   aliases: {
-    eql:       :equal,
-    str:       :string,
-    upper:     :upcase,
-    lower:     :downcase,
-    quoted:    :str_literal,
-    minute:    :min,
-    second:    :sec,
-    get_func:  :get_function,
-    get_ins:   :get_instruction,
-    get_u64:   :get_dword,
-    get_s64:   :get_signed_dword,
-    get_u32:   :get_word,
-    get_s32:   :get_word,
-    get_int:   :get_word,
-    get_u16:   :get_hword,
-    get_s16:   :get_signed_hword,
-    get_u8:    :get_byte,
-    get_s8:    :get_signed_byte,
-    get_cstr:  :get_cstring
+    eql:      :equal,
+    str:      :string,
+    upper:    :upcase,
+    lower:    :downcase,
+    quoted:   :str_literal,
+    minute:   :min,
+    second:   :sec,
+    get_func: :get_function,
+    get_ins:  :get_instruction,
+    get_u64:  :get_dword,
+    get_s64:  :get_signed_dword,
+    get_u32:  :get_word,
+    get_s32:  :get_word,
+    get_int:  :get_word,
+    get_u16:  :get_hword,
+    get_s16:  :get_signed_hword,
+    get_u8:   :get_byte,
+    get_s8:   :get_signed_byte,
+    get_cstr: :get_cstring
   }).freeze
 
 

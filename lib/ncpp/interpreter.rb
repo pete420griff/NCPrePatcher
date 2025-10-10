@@ -29,13 +29,15 @@ module NCPP
       # interpreter environment-specific commands
       @commands = CommandRegistry.new({
         put: ->(x, new_line=true) {
-          x = x.to_s.gsub!('[','{').gsub!(']','}') if x.is_a? Array
           if new_line
             @out_stack << String(x)
           else
             @out_stack[-1] << String(x)
           end
         },
+        top_of_out_stack: -> { @out_stack[0] }.returns(String),
+        end_of_out_stack: -> { @out_stack[-1] }.returns(String),
+        clear_out_stack: -> { @out_stack.clear },
         ruby: ->(code_str) { eval(code_str, get_binding) },
         do_command: ->(cmd_str, *args) { @commands[cmd_str.to_sym].call(*args) }.returns(Object),
         define_command: ->(name, block) {
@@ -86,6 +88,7 @@ module NCPP
 
       @variables = {
         SYMBOL_COUNT: Unarm.symbols.count,
+        OVERLAY_COUNT: $rom.overlay_count,
         GAME_TITLE: $rom.header.game_title,
         NITRO_SDK_VERSION: $rom.nitro_sdk_version,
       }.merge(CORE_VARIABLES)
@@ -103,7 +106,7 @@ module NCPP
 
     def eval_expr(node, subs = nil)
       case node
-        when Numeric, String
+        when Numeric, String, Array
           node
 
         when Hash
@@ -116,7 +119,7 @@ module NCPP
             cmd = @commands[node[:cmd_name].to_sym] or raise "Unknown command #{node[:cmd_name]}"
             args = Array(node[:args]).map { |a| eval_expr(a, subs) }
             ret = cmd.call(*args)
-            cmd.return_type.nil? ? nil : ret
+            cmd.return_type.nil? ? nil : (node[:subscript_idx].nil? ? ret : ret[eval_expr(node[:subscript_idx], subs)])
 
           elsif node[:base] && node[:chain] # chained command call
             acc = eval_expr(node[:base], subs)
@@ -133,15 +136,32 @@ module NCPP
           elsif node[:var_name]
             if !subs.nil?
               ret = subs[node[:var_name].to_s]
-              return ret unless ret.nil?
+              puts ret
+              puts node[:subscript_idx]
+              return (node[:subscript_idx].nil? ? ret : ret[eval_expr(node[:subscript_idx], subs)]) unless ret.nil?
             end
-            @variables[node[:var_name].to_sym] or raise "Unknown variable: #{node[:var_name]}"
+            ret = @variables[node[:var_name].to_sym] or raise "Unknown variable: #{node[:var_name]}"
+            node[:subscript_idx].nil? ? ret : ret[eval_expr(node[:subscript_idx], subs)]
 
           elsif node[:block]
             Block.new(node[:block], node[:args], self)
 
+          elsif node[:array]
+            arr = Array(node[:array]).map { |a| eval_expr(a, subs) }
+            if node[:subscript_idx].nil?
+              arr
+            else
+              arr[eval_expr(node[:subscript_idx], subs)]
+            end
+
+          elsif node[:string]
+            node[:string].to_s[eval_expr(node[:subscript_idx], subs)]
+
           elsif node[:bool]
             eval(node[:bool])
+
+          elsif node[:nil]
+            nil
 
           else
             raise "Unknown node type: #{node.inspect}"
@@ -224,7 +244,7 @@ module NCPP
               rtree_s = tree.to_s.reverse
 
               # finds the end of the expression (hacky)
-              last_paren = Integer(/\d+/.match(rtree_s[..rtree_s.index('__outer_paren__: '.reverse)].reverse).to_s) + 1
+              last_paren = Integer(/\d+/.match(rtree_s[..rtree_s.index('__last_char__: '.reverse)].reverse).to_s) + 1
 
               ast = @transformer.apply(tree)
               value = eval_expr(ast)
@@ -260,16 +280,16 @@ module NCPP
   #
   class REPL < Interpreter
 
-    def run
+    def run(debug = false)
       loop do
         begin
           print '> '; expr = STDIN.gets.chomp
           next if expr.empty?
 
           parsed_tree = @parser.parse(expr, root: :expression)
-          # puts "Parsed tree: #{parsed_tree.inspect}"
+          puts "Parsed tree: #{parsed_tree.inspect}" if debug
           ast = @transformer.apply(parsed_tree)
-          # puts "Transformed tree: #{ast.inspect}"
+          puts "Transf tree: #{ast.inspect}" if debug
           out = eval_expr(ast)
           @out_stack << out unless out.nil?
           puts @out_stack.join("\n")
