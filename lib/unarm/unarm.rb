@@ -170,11 +170,11 @@ module UnarmBind
   end
 
   class StatusMask < FFI::Struct
-    layout :control,    :bool, # control field mask (c)
-           :extension,  :bool, # extension field mask (x)
-           :flags,      :bool, # flags field mask (f)
+    layout :control,    :bool,  # control field mask (c)
+           :extension,  :bool,  # extension field mask (x)
+           :flags,      :bool,  # flags field mask (f)
            :reg,        :uint8, # StatusReg
-           :status,     :bool # status field mask (s)
+           :status,     :bool   # status field mask (s)
 
     def control?
       self[:control]
@@ -435,17 +435,6 @@ module Unarm
       sym = sym[2..]
       is_vtable = true
 
-    elsif sym.start_with? 'nw'
-      return 'new'
-
-    elsif sym.start_with? 'na'
-      return 'new[]'
-
-    elsif sym.start_with? 'dl'
-      return 'delete'
-
-    elsif sym.start_with? 'da'
-      return 'delete[]'
     end
 
     names = []
@@ -456,6 +445,24 @@ module Unarm
       n       = sym[len_end, n_len]
       names   << n
       sym     = sym[len_end + n_len..]
+    end
+
+    unless sym.nil?
+      if sym.start_with? 'nw'
+        names << 'new'
+
+      elsif sym.start_with? 'na'
+        names << 'new[]'
+
+      elsif sym.start_with? 'dl'
+        names << 'delete'
+
+      elsif sym.start_with? 'da'
+        names << 'delete[]'
+
+      elsif sym.match? /D\d/
+        names << sym[..1]
+      end
     end
 
     names.join('::') + (is_vtable ? '::vtable' : '')
