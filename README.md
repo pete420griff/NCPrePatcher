@@ -8,9 +8,9 @@ A preprocessor for [NCPatcher](https://github.com/TheGameratorT/NCPatcher) with 
 
 - [Ruby (≥ 3.4 required)](https://www.ruby-lang.org/en/downloads/)
 
-Go to Releases, download the .gem file for your platform, then open up the command line where it was downloaded to and enter:
+From the command line, enter:
 ```console
-gem install NCPrePatcher-[version]-[platform].gem
+gem install NCPrePatcher
 ```
 
 The `ncpp` command should now be available at your command line (a system reboot may be required).
