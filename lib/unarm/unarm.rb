@@ -425,14 +425,14 @@ module Unarm
 
     is_vtable = false
 
-    if sym.start_with? 'N'
+    if sym.start_with? 'NK'
+      sym = sym[2..]
+
+    elsif sym.start_with? 'N'
       sym = sym[1..]
 
-    elsif sym.start_with? 'NK'
-      sym = sym[2..]
-
     elsif sym.start_with? 'TV'
-      sym = sym[2..]
+      sym = sym[(sym[2] == 'N' ? 3 : 2)..]
       is_vtable = true
 
     end
@@ -460,7 +460,13 @@ module Unarm
       elsif sym.start_with? 'da'
         names << 'delete[]'
 
-      elsif sym.match? /D\d/
+      elsif sym.start_with? 'eq'
+        names << '=='
+
+      elsif sym.start_with? 'ne'
+        names << '!='
+
+      elsif sym.match? /[DC]\d/
         names << sym[..1]
       end
     end
@@ -474,7 +480,7 @@ module Unarm
   end
 
   class Symbols
-    attr_reader :map, :locs, :count, :demangled_map
+    attr_reader :map, :locs, :count, :demangled_map, :ambig_demangled
 
     def self.load(file_path)
       syms = {} # maps symbol names to their addresses
@@ -534,8 +540,15 @@ module Unarm
       @count = @map.length
 
       @demangled_map = {}
-      @map.each do |sym, _addr|
-        @demangled_map[Unarm.shitty_demangle(sym)] = sym
+      @ambig_demangled = []
+
+      @map.each do |sym, addr|
+        demangled = Unarm.shitty_demangle(sym)
+        if @demangled_map[demangled].nil?
+          @demangled_map[demangled] = sym
+        else
+          @ambig_demangled << [demangled, addr]
+        end
       end
     end
 
@@ -598,9 +611,8 @@ module Unarm
       alias_method :disasm, :new
     end
 
-    attr_reader :raw, :opcode_id, :arguments, :address
+    attr_reader :raw, :arguments, :address
 
-    alias_method :op_id, :opcode_id
     alias_method :args, :arguments
     alias_method :addr, :address
 
@@ -620,11 +632,11 @@ module Unarm
     alias_method :==, :eql?
 
     def opcode
-      UnarmBind::OPCODE[@op_id]
+      UnarmBind::OPCODE[@opcode_id]
     end
 
     def mnemonic
-      UnarmBind::OPCODE_MNEMONIC[@op_id]
+      UnarmBind::OPCODE_MNEMONIC[@opcode_id]
     end
 
     def is_conditional?
@@ -678,12 +690,11 @@ module Unarm
     end
     alias_method :branch_to_reg?, :branch_to_register?
 
-    # this won't catch everything but I think it's good enough
     def function_end?
       return false if conditional?
 
       branch_to_register? ||
-        (mnemonic == 'pop' && args[1].contains?(:pc)) ||
+        (mnemonic == 'pop' && args[0].value.contains?(:pc)) ||
         (mnemonic == 'ldm' && args[0].value.reg == :sp && args[1].value.contains?(:pc))
     end
 
@@ -705,7 +716,7 @@ module Unarm
       end
 
       @arguments = Arguments.new(send(:"#{Unarm.cpu.to_s}_arm_ins_get_args", @ptr))
-      @op_id = send(:"#{Unarm.cpu.to_s}_arm_ins_get_opcode_id", @ptr)
+      @opcode_id = send(:"#{Unarm.cpu.to_s}_arm_ins_get_opcode_id", @ptr)
 
       @conditional = arm_ins_is_conditional(@ptr)
       @data_op     = arm_ins_is_data_operation(@ptr)
@@ -735,7 +746,7 @@ module Unarm
       end
 
       @arguments = Arguments.new(send(:"#{Unarm.cpu.to_s}_thumb_ins_get_args", @ptr))
-      @op_id = send(:"#{Unarm.cpu.to_s}_thumb_ins_get_opcode_id", @ptr)
+      @opcode_id = send(:"#{Unarm.cpu.to_s}_thumb_ins_get_opcode_id", @ptr)
 
       @conditional = thumb_ins_is_conditional(@ptr)
       @data_op     = thumb_ins_is_data_operation(@ptr)

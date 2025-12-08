@@ -17,7 +17,7 @@ The `ncpp` command should now be available at your command line (a system reboot
 
 ## Usage
 
-NCPrePatcher can be used as a Ruby library or as a preprocessor alongside NCPatcher.
+NCPrePatcher can be used as a Ruby library or, as it was built for, as a preprocessor alongside NCPatcher.
 
 For the former, simply `require` it as you would with any gem:
 ```ruby
@@ -28,14 +28,19 @@ For the latter, navigate to an existing project using NCPatcher (where an `ncpat
 ```console
 ncpp
 ```
-It will be installed into your project. Subsequently, running `ncpp` manually is no longer required, it runs when NCPatcher does.
+Follow the directions given, and it will be installed into your project. Subsequently, running `ncpp` manually will no longer be required; being added as a pre-build command in `ncpatcher.json`, it will run when NCPatcher does.
 
-To view what else it can do, run:
+For examples of usage as a preprocessor, see [ncpp-demos](https://github.com/pete420griff/ncpp-demos).
+
+To view what else NCPrePatcher can do, run:
 ```console
 ncpp --help
 ```
 
 ## Building
+
+> [!NOTE]
+> This is an alternative to installing NCPrePatcher via the methods described in [the installation guide](#installation)
 
 #### Requirements
 

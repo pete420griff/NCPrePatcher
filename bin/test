@@ -1,4 +1,7 @@
 #!/usr/bin/env ruby
 
 require_relative '../lib/ncpp.rb'
+
+# TODO: actual tests?
+
 NCPP.run(ARGV)

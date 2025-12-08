@@ -24,39 +24,43 @@ module NCPP
     end
 
     rule :expression do
-      binary_operation | body
+      ternary_operation | binary_operation | unary_operation | body
     end
-
 
     rule :body do
       float | integer | boolean | null | string | command | block | array | variable
     end
 
     rule :binary_operation do
-      infix_expression(spaced(primary),
-        [match['*/%'],        8, :left], # mul, div, modulo
-        [match['+-'],         7, :left], # add, sub
-        [str('<<')|str('>>'), 6, :left], # bitwise left/right shift 
-        [str('==')|str('!='), 5, :left], # relational =, ≠
+      infix_expression(spaced(unary_operation|primary),
+        [match['*/%'],        11, :left], # mul, div, modulo
+        [match['+-'],         10, :left], # add, sub
+        [str('<<')|str('>>'), 9,  :left], # bitwise left/right shift 
+        [str('<=>'),          8,  :left], # three-way comparison
         [match['><'] >> str('=').maybe,
-                              4, :left], # relational >, ≥, <, ≤
-        [str('&'),            3, :left], # bitwise AND
-        [str('^'),            2, :left], # bitwise XOR
-        [str('|'),            1, :left]  # bitwise OR
-      ) | 
-      infix_expression(spaced(string | chained_command),
-        [str('*'), 2, :left], # string multiplication
-        [str('+')|str('<<')|  # string concatenation
-         str('==')|str('!='), # string comparison
-         1, :left]
+                              7,  :left], # relational >, ≥, <, ≤
+        [str('==')|str('!='), 6,  :left], # relational =, ≠
+        [str('&&'),           2,  :left], # logical AND
+        [str('||'),           1,  :left], # logical OR
+        [str('&'),            5,  :left], # bitwise AND
+        [str('^'),            4,  :left], # bitwise XOR
+        [str('|'),            3,  :left]  # bitwise OR
       )
+    end
+
+    rule :ternary_operation do
+      (binary_operation|unary_operation|primary).as(:cond) >> spaced(str('?')) >> primary.as(:e1) >> spaced(str(':')) >> primary.as(:e2)
+    end
+
+    rule :unary_operation do
+      match['!~\\-+*'].as(:op) >> primary.as(:e)
     end
 
     rule :primary do
       chained_command | command | variable | group | float | integer
     end
 
-    rule(:group) { lparen >> (expression | str('')).as(:group) >> rparen >> lbrace.absent? }
+    rule(:group) { lparen >> (expression.as(:group) | str('').as(:empty_group)) >> rparen >> lbrace.absent? }
 
     rule(:identifier) { digits.absent? >> match['A-Za-z0-9_'].repeat(1) }
 
@@ -66,10 +70,10 @@ module NCPP
           (expression >> (comma >> expression).repeat).repeat.as(:args) >>
         rparen.as(:__last_char__) >> subscript.maybe
     end
-    
+
     rule(:boolean) { (str('true') | str('false')).as(:bool) }
 
-    rule(:null) { str('nil').as(:nil) }
+    rule(:null) { (str('nil') | str('NULL')).as(:nil) }
 
     rule :variable do
       str(@COMMAND_PREFIX).maybe >> identifier.as(:var_name) >> lparen.absent? >> subscript.maybe
@@ -84,6 +88,12 @@ module NCPP
         (identifier >> (comma >> identifier).repeat).as(:block_args).maybe >>
       rparen
     end
+
+    # rule :block_sequence do
+    #   block_args.maybe >> lbrace >>
+    #     (block >> (comma >> block).repeat).as(:block_sequence) >>
+    #   rbrace >> subscript.maybe
+    # end
 
     rule :array do
       lbracket >>
@@ -124,8 +134,7 @@ module NCPP
     rule(:bin_digits) { bin_digit.repeat(1) }
 
     rule :float do
-      (str('-').maybe >>
-        digits.maybe >>
+      (digits.maybe >>
         (
           (
             str('.')|str('e')) >>
@@ -140,7 +149,8 @@ module NCPP
     end
 
     rule :integer do
-      (str('-').maybe >> (
+      (
+        (
         (str('0x') >> hex_digits) |
         (str('0b') >> bin_digits) |
         digits)
@@ -178,9 +188,18 @@ module NCPP
     end
 
     rule(group: subtree(:g)) { g }
+    rule(empty_group: simple(:g)) { nil }
 
     rule(l: subtree(:lhs), o: simple(:op), r: subtree(:rhs)) do
       { infix: true, lhs: lhs, op: op.to_s, rhs: rhs }
+    end
+
+    rule(cond: subtree(:cond), e1: subtree(:e1), e2: subtree(:e2)) do
+      { cond: cond, e1: e1, e2: e2 }
+    end
+
+    rule(op: simple(:op), e: subtree(:e)) do
+      { op: op.to_s, e: e }
     end
 
     rule(cmd_name: simple(:n), args: subtree(:a)) do
