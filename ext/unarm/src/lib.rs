@@ -201,12 +201,12 @@ impl<'a> unarm::LookupSymbol for SymbolSlice<'a> {
 }
 
 const ARM9_PARSE_FLAGS: ParseFlags = ParseFlags {
-	ual: false,
+	ual: true,
 	version: ArmVersion::V5Te,
 };
 
 const ARM7_PARSE_FLAGS: ParseFlags = ParseFlags {
-	ual: false,
+	ual: true,
 	version: ArmVersion::V4T,
 };
 
