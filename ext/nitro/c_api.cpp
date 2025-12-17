@@ -175,6 +175,10 @@ extern "C" {
 		return bin->getSize();
 	}
 
+	NITRO_API const void* codeBin_getSectPtr(const ICodeBin* bin, u32 address, size_t sect_size) {
+		return (bin->getStartAddress() + bin->getSize() < address + sect_size) ? nullptr : bin->getPtrToData(address);
+	}
+
 
 	NITRO_API ArmBin* armBin_alloc() {
 		return new(std::nothrow) ArmBin;
@@ -194,6 +198,14 @@ extern "C" {
 
 	NITRO_API const ArmBin::ModuleParams* armBin_getModuleParams(const ArmBin* arm) {
 		return arm->getModuleParams();
+	}
+
+	NITRO_API const ArmBin::AutoLoadEntry* armBin_getAutoloadEntry(const ArmBin* arm, u32 entryID) {
+		return &arm->getAutoloadList()[entryID];
+	}
+
+	NITRO_API size_t armBin_getAutoloadEntryCount(const ArmBin* arm) {
+		return arm->getAutoloadList().size();
 	}
 
 	NITRO_API bool armBin_sanityCheckAddress(const ArmBin* arm, u32 addr) {

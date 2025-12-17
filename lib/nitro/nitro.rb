@@ -13,6 +13,7 @@ module NitroBind
   typedef :pointer, :codebin_handle
   typedef :pointer, :ovte_handle
   typedef :pointer, :module_params_handle
+  typedef :pointer, :autoload_entry_handle
 
   attach_function :nitroRom_alloc, [], :rom_handle
   attach_function :nitroRom_release, [:rom_handle], :void
@@ -48,12 +49,15 @@ module NitroBind
   attach_function :codeBin_readCString, [:codebin_handle, :uint32], :string
   attach_function :codeBin_getSize, [:codebin_handle], :uint32
   attach_function :codeBin_getStartAddress, [:codebin_handle], :uint32
+  attach_function :codeBin_getSectPtr, [:codebin_handle, :uint32, :size_t], :pointer
 
   attach_function :armBin_alloc, [], :codebin_handle
   attach_function :armBin_release, [:codebin_handle], :void
   attach_function :armBin_load, [:codebin_handle, :string, :uint32, :uint32, :uint32, :bool], :bool
   attach_function :armBin_getEntryPointAddress, [:codebin_handle], :uint32
   attach_function :armBin_getModuleParams, [:codebin_handle], :module_params_handle
+  attach_function :armBin_getAutoloadEntry, [:codebin_handle, :size_t], :autoload_entry_handle
+  attach_function :armBin_getAutoloadEntryCount, [:codebin_handle], :size_t
   attach_function :armBin_sanityCheckAddress, [:codebin_handle, :uint32], :bool
 
   attach_function :overlayBin_alloc, [], :codebin_handle
@@ -176,7 +180,7 @@ module Nitro
       raise ArgumentError, 'step must be 1, 2, 4, or 8 (bytes)' unless [1,2,4,8].include? step
       raise ArgumentError, 'range must be a Range' unless range.is_a? Range
 
-      clamped = Range.new([range.begin || start_addr, start_addr].max, [range.end || end_addr, end_addr].min)
+      clamped = Range.new(range.begin || start_addr, [range.end || end_addr, end_addr].min)
 
       clamped.step(step).map { |addr| [send(:"read#{step * 8}", addr), addr] }
     end
@@ -211,17 +215,25 @@ module Nitro
       end
     end
 
-    def read_cstring(start_addr)
-      codeBin_readCString(@ptr, start_addr)
+    def read_cstring(addr)
+      codeBin_readCString(@ptr, addr)
     end
     alias_method :read_cstr, :read_cstring
+
+    def get_section_ptr(addr, sect_size)
+      ptr = FFI::MemoryPointer.new(:pointer, 1)
+      ptr.write_pointer(codeBin_getSectPtr(@ptr, addr, sect_size))
+      raise "Could not read #{sect_size} bytes from address #{addr.to_hex}" if ptr.read_pointer == FFI::Pointer::NULL
+      ptr.read_pointer
+    end
+    alias_method :get_sect_ptr, :get_section_ptr
 
   end
 
   class ArmBin < CodeBin
     include NitroBind
 
-    attr_reader :module_params
+    attr_reader :module_params, :autoload_entries
 
     class ModuleParams < FFI::Struct
       layout :autoload_list_start, :uint32,
@@ -235,10 +247,17 @@ module Nitro
              :nitro_code_le,       :uint32
     end
 
+    class AutoLoadEntry < FFI::Struct
+      layout :address,     :uint32,
+             :size,        :uint32,
+             :bss_size,    :uint32,
+             :data_offset, :uint32
+    end
+
     def initialize(args = {})
       if args.has_key? :file_path
         @ptr = FFI::AutoPointer.new(armBin_alloc, method(:armBin_release))
-        if not File.exist? args[:file_path]
+        if !File.exist?(args[:file_path])
           puts "Error: #{args[:file_path]} does not exist"
           raise 'ArmBin initialization failed'
         end
@@ -253,6 +272,9 @@ module Nitro
       end
 
       @module_params = ModuleParams.new(armBin_getModuleParams(@ptr))
+      @autoload_entries = []
+      autoload_entry_count = armBin_getAutoloadEntryCount(@ptr)
+      autoload_entry_count.times {|id| autoload_entries << AutoLoadEntry.new(armBin_getAutoloadEntry(@ptr,id)) }
     end
 
     def entry_point_address

@@ -181,6 +181,22 @@ bool ArmBin::writeBytes(u32 address, const void* data, u32 size) {
 	return false;
 }
 
+const void* ArmBin::getPtrToData(u32 address) const {
+
+	u32 autoloadStart = getModuleParams()->autoloadStart;
+	if (address >= m_ramAddr && address < autoloadStart) {
+		return &m_bytes[address - m_ramAddr];
+	}
+
+	for (const AutoLoadEntry& autoload : m_autoloadList) {
+		u32 autoloadEnd = autoload.address + autoload.size;
+		if (address >= autoload.address && address < autoloadEnd) {
+			return &m_bytes[autoload.dataOffset + (address - autoload.address)];
+		}
+	}
+	return nullptr;
+}
+
 void ArmBin::refreshAutoloadData() {
 
 	u8* bytesData = m_bytes.data();

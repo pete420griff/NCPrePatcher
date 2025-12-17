@@ -45,11 +45,11 @@ public:
 
 	bool readBytes(u32 address, void* out, u32 size) const override;
 	bool writeBytes(u32 address, const void* data, u32 size) override;
-	
+
 	u32 getSize() const override { return static_cast<u32>(m_bytes.size()); }
 	u32 getStartAddress() const override { return m_ramAddr; }
 
-	const void* getPtrToData(u32 address) const override { return &m_bytes[address - m_ramAddr]; }
+	const void* getPtrToData(u32 address) const override;
 
 	void refreshAutoloadData();
 
