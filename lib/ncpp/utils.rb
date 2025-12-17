@@ -1,5 +1,6 @@
 require_relative '../nitro/nitro.rb'
 require_relative '../unarm/unarm.rb'
+require_relative '../unicorn/unicorn.rb'
 
 require 'did_you_mean/jaro_winkler'
 require 'did_you_mean/levenshtein'
@@ -265,6 +266,11 @@ module NCPP
       end
     end
 
+    def self.get_byte_str(loc, ov, size)
+      addr, _ov, code_bin = resolve_code_loc(loc, ov)
+      code_bin.get_sect_ptr(addr,size).read_array_of_uint8(size).pack('C*')
+    end
+
     def self.find_branch_to(branch_dest, start_loc, start_ov=nil, from_func: false, find_all: false)
       start_addr, _ov, code_bin = resolve_code_loc(start_loc, start_ov)
       if branch_dest.is_a? Array
@@ -421,6 +427,40 @@ module NCPP
     def self.gen_hex_edit(ov, og_hex_str, new_hex_str)
       addr = find_hex_bytes(ov, og_hex_str)
       gen_repl_array(addr, ov, DTYPE_IDS[:u8], [new_hex_str].pack('H*').unpack('C*'))
+    end
+
+    def self.emulate_func(func_loc, ov, *args)
+      addr, ov, code_bin = resolve_code_loc(func_loc,ov)
+      $emu.load_overlay(ov) if !ov.nil? && ov >= 0
+      $emu.call_func(addr, *args)
+    end
+
+    def self.emu_get_mem(loc, size)
+      addr, ov = resolve_loc(loc)
+      $emu.load_overlay(ov) if !ov.nil? && ov >= 0
+      $emu.read_mem(addr, size)
+    end
+
+    def self.emu_set_mem(loc, byte_str)
+      addr, ov = resolve_loc(loc)
+      $emu.load_overlay(ov) if !ov.nil? && ov >= 0
+      $emu.write_mem(addr, byte_str)
+    end
+
+    def self.assemble_arm(asm, addr: 0)
+      if asm.is_a? Array
+        asm.map.with_index {|ins,idx| $arm_assembler.assemble(ins,addr+4*idx).unpack('L')[0] }
+      else
+        $arm_assembler.assemble(asm).unpack('L')[0]
+      end
+    end
+
+    def self.assemble_thumb(asm, addr: 0)
+      if asm.is_a? Array
+        asm.map.with_index {|ins,idx| $thumb_assembler.assemble(ins,addr+2*idx).unpack('S')[0] }
+      else
+        $thumb_assembler.assemble(asm).unpack('S')[0]
+      end
     end
 
     class << self
@@ -596,7 +636,7 @@ class Nitro::CodeBin
 
       instructions << ins
 
-      if target = ins.target_addr
+      if target = ins.target_addr # if target addr not nil
         pool[target] ||= Unarm::Data.new(read_word(target), addr: target, loc: get_loc)
       end
 
@@ -695,6 +735,47 @@ class Nitro::CodeBin
     raise 'Could not find hex byte string in binary.' if found != target_len
 
     found_addr - (target_len - 1) * 4
+  end
+
+end
+
+#
+# Various utility methods tying Unicorn to the Unarm and Nitro modules
+#
+class Unicorn::Emulator
+
+  def load_arm9
+    arm = $rom.arm9
+    main_added = false
+    arm.autoload_entries.sort_by {|e| e[:address] }.each do |e|
+      if e[:address] > arm.end_addr # DTCM found
+        add_region(Uc::Region.new(e[:address], 16*1024))
+        next
+      end
+      if !main_added && e[:address] > arm.start_addr # Main section found
+        size = e[:address] - arm.start_addr
+        add_section(Uc::Sect.new(arm.start_addr, arm.get_sect_ptr(arm.start_addr,size), size))
+        main_added = true
+      end
+      next if e[:address]+e[:size] <= e[:address]
+      ptr = arm.get_sect_ptr(e[:address],e[:size])
+      add_section(Uc::Sect.new(e[:address], ptr, e[:size]))
+    end
+  end
+
+  def load_overlay(ov_id)
+    ov = $rom.get_overlay(ov_id)
+    add_section(Uc::Sect.new(ov.start_addr, ov.get_sect_ptr(ov.start_addr, ov.size), ov.size))
+  end
+  alias_method :load_ov, :load_overlay
+
+  def call_func(addr, *args)
+    raise "Calling functions with more than 4 args isn't supported yet" if args.length > 4
+    args.each_with_index do |arg,i|
+      send(:"write_r#{i}", arg)
+    end
+    run(from: addr, to: read_lr, timeout_ms: 5000)
+    read_r0
   end
 
 end

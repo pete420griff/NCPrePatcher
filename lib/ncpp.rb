@@ -1,5 +1,7 @@
 require_relative 'nitro/nitro.rb'
 require_relative 'unarm/unarm.rb'
+require_relative 'unicorn/unicorn.rb'
+require_relative 'keystone/keystone.rb'
 require_relative 'ncpp/interpreter.rb'
 
 require 'json'
@@ -14,6 +16,10 @@ module NCPP
   $target_rom = nil
 
   alias $rom $clean_rom # In most cases the clean rom will be desired
+
+  $emu = nil
+  $arm_assembler = nil
+  $thumb_assembler = nil
 
   $config = nil
 
@@ -141,6 +147,11 @@ module NCPP
 
     Unarm.load_symbols9(cfg['symbols9'].gsub(/\$\{env:([^}]+)\}/) { ENV[$1] }) unless cfg['symbols9'].empty?
     Unarm.load_symbols7(cfg['symbols7'].gsub(/\$\{env:([^}]+)\}/) { ENV[$1] }) unless cfg['symbols7'].empty?
+
+    $emu = Uc::Emu.new
+    $emu.load_arm9
+    $arm_assembler = Ks::Assembler.new
+    $thumb_assembler = Ks::Assembler.new(mode: Ks::KS_MODE_THUMB)
   end
 
   def self.uninstall(cfg_path = CONFIG_FILE_PATH)
@@ -426,29 +437,12 @@ module NCPP
         end
       end
 
-      # interpreter = CFileInterpreter.new(
-      #   files, $config['gen_path'], $config['command_prefix'], extra_commands, extra_variables,
-      #   safe: safe_mode, puritan: puritan_mode
-      # )
-      # interpreter.run(verbose: !quiet)
-      # lines_parsed += interpreter.lines_parsed
-
-      # unless interpreter.incomplete_files.empty?
-      #   interpreter.incomplete_files.each do |file|
-      #     timestamp_cache.delete(file)
-      #     success = false
-      #   end
-      # end
-
     end
 
     timestamp_cache['NCPP_VERSION'] = VERSION
 
     FileUtils.mkdir_p(File.dirname(timestamp_cache_path))
     File.write(timestamp_cache_path, JSON.generate(timestamp_cache))
-
-    # FileUtils.mkdir_p(File.dirname(cmd_cache_path))
-    # File.write(cmd_cache_path, JSON.generate(command_cache))
 
     unless quiet
       if lines_parsed > 0

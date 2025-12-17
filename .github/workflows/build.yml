@@ -3,7 +3,6 @@ name: Build
 on:
   push:
     branches: [ master ]
-
   pull_request:
     branches: [ master ]
 
@@ -13,6 +12,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
 
     steps:
       - name: Checkout repository
@@ -45,6 +47,65 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --yes
+
+      - name: Clone vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+
+      - name: Bootstrap vcpkg (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          ./vcpkg/bootstrap-vcpkg.sh
+
+      - name: Bootstrap vcpkg (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          .\vcpkg\bootstrap-vcpkg.bat
+
+      - name: Install vcpkg packages (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          ./vcpkg/vcpkg install unicorn keystone --triplet x64-linux
+
+      - name: Install vcpkg packages (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          ./vcpkg/vcpkg install unicorn keystone --triplet arm64-osx
+
+      - name: Install vcpkg packages (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          .\vcpkg\vcpkg.exe install unicorn keystone --triplet x64-windows
+
+      - name: Collect unicorn & keystone libraries (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          set -e
+          mkdir -p lib/unicorn lib/keystone
+
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            TRIPLET=arm64-osx
+          else
+            TRIPLET=x64-linux
+          fi
+
+          cp -v vcpkg/installed/$TRIPLET/lib/libunicorn* lib/unicorn/ || true
+          cp -v vcpkg/installed/$TRIPLET/lib/libkeystone* lib/keystone/ || true
+
+          cp -v vcpkg/installed/$TRIPLET/bin/libunicorn* lib/unicorn/ || true
+          cp -v vcpkg/installed/$TRIPLET/bin/libkeystone* lib/keystone/ || true
+
+      - name: Collect unicorn & keystone libraries (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Force lib\unicorn | Out-Null
+          New-Item -ItemType Directory -Force lib\keystone | Out-Null
+
+          Copy-Item vcpkg\installed\x64-windows\lib\unicorn*.lib lib\unicorn\ -ErrorAction SilentlyContinue
+          Copy-Item vcpkg\installed\x64-windows\bin\unicorn*.dll lib\unicorn\ -ErrorAction SilentlyContinue
+
+          Copy-Item vcpkg\installed\x64-windows\lib\keystone*.lib lib\keystone\ -ErrorAction SilentlyContinue
+          Copy-Item vcpkg\installed\x64-windows\bin\keystone*.dll lib\keystone\ -ErrorAction SilentlyContinue
 
       - name: Run build script
         run: ruby ext/build.rb

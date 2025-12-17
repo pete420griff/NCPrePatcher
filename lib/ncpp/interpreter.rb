@@ -170,7 +170,8 @@ module NCPP
         def:           :define,
         desc:          :describe,
         get_cmd_names: :get_command_names,
-        get_var_names: :get_variable_names
+        get_var_names: :get_variable_names,
+        clear_cache:   :invalidate_cache
       }).freeze
     end
 

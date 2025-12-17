@@ -206,6 +206,9 @@ module NCPP
     hex: ->(i) { Utils.integer_check(i,'hex'); i.to_hex }.returns(String)
       .describe('Returns a hexadecimal representation of the given Integer.'),
 
+    ord: ->(s) { s.ord }.returns(Integer)
+      .describe('Gets the Integer ordinal of the first character in the given String.'),
+
     string: ->(x) { String(x) }.returns(String)
       .describe('Gets the given argument as a String.'),
 
@@ -587,6 +590,7 @@ module NCPP
     exp: ->(n) { Math.exp(n) }.returns(Float).describe('Gets e raised to the power of the given number.'),
     log: ->(n) { Math.log(n) }.returns(Float).describe('Gets the base logarithm of the given number.'),
     sqrt: ->(n) { Math.sqrt(n) }.returns(Float).describe('Gets the square root of the given number.'),
+    round: ->(f, n_digits=0) { f.round(n_digits) }.returns(Numeric),
     clamp: ->(n, min,max=nil) { n.clamp(min,max) }.returns(Numeric)
       .describe('Clamps number between given min and max values.'),
 
@@ -644,7 +648,7 @@ module NCPP
                 "the original ASM with the immediate swapped to the value given."),
 
     repl_array: ->(loc, ov, dtype, arr) { Utils.gen_repl_array(loc,ov,dtype,arr) }.returns(String),
-    
+
     repl_u64_array: ->(loc,ov_or_arr,arr=nil) { Utils.gen_repl_type_array(loc, ov_or_arr, :u64, arr) }.returns(String),
     repl_s64_array: ->(loc,ov_or_arr,arr=nil) { Utils.gen_repl_type_array(loc, ov_or_arr, :s64, arr) }.returns(String),
     repl_u32_array: ->(loc,ov_or_arr,arr=nil) { Utils.gen_repl_type_array(loc, ov_or_arr, :u32, arr) }.returns(String),
@@ -677,10 +681,14 @@ module NCPP
     get_signed_byte:  ->(addr,ov=nil) { Utils.get_signed_byte(addr,ov) }.returns(Integer),
     get_cstring: ->(addr,ov=nil) { Utils.get_cstring(addr,ov) }.returns(String),
     get_array: ->(addr,ov,e_type_id,e_count=1) { Utils.get_array(addr,ov,e_type_id,e_count) }.returns(Array),
+    get_chars: ->(addr,ov, char_count) { Utils.get_array(addr,ov,Utils::DTYPE_IDS[:u8],char_count).map { it.chr } }
+      .returns(Array),
 
     get_c_array: ->(addr,ov,e_type_id,e_count=1) {
       Utils.to_c_array(Utils.get_array(addr,ov,e_type_id,e_count))
     }.returns(Array),
+
+    get_byte_str: ->(loc,ov,size) { Utils.get_byte_str(loc,ov,size) }.returns(String),
 
     find_first_branch_to: ->(branch_dest, start_loc,start_ov=nil) {
       Utils.find_branch_to(branch_dest, start_loc,start_ov)
@@ -772,6 +780,14 @@ module NCPP
     s16: ->(n) { n.signed(16)   }.returns(Integer).describe('Gets the given number as a signed 16-bit Integer.'),
     u8: ->(n)  { n.unsigned(8)  }.returns(Integer).describe('Gets the given number as an unsigned 8-bit Integer.'),
     s8: ->(n)  { n.signed(8)    }.returns(Integer).describe('Gets the given number as a signed 8-bit Integer.'),
+    char: ->(n) { n.unsigned(8).chr }.returns(String).describe('Gets the given number as an ASCII character.'),
+
+    sizeof: ->(dtype) { Utils::DTYPES[dtype][:size] }.returns(Integer),
+
+    f32: ->(n) { [n].pack('g').unpack('L>') }.returns(Integer),
+    f64: ->(n) { [n].pack('G').unpack('Q>') }.returns(Integer),
+    from_f32: ->(n) { [n].pack('L>').unpack('g')[0] }.returns(Float),
+    from_f64: ->(n) { [n].pack('Q>').unpack('G')[0] }.returns(Float),
 
     from_fx_deg: ->(fx_num) {
       Float(fx_num) / 0x10000 * 360
@@ -794,7 +810,36 @@ module NCPP
     from_gx_rgb: ->(n) { [(n >> 0) & 31, (n >> 5) & 31, (n >> 10) & 31] }.returns(Array)
       .describe('Unpacks the given RGB x1B5G5R5 value as an Array ([R,G,B]).'),
     from_gx_rgba: ->(n) { [(n >> 0) & 31, (n >> 5) & 31, (n >> 10) & 31, (n >> 15) & 1] }.returns(Array)
-      .describe('Unpacks the given packed RGB A1B5G5R5 value as an Array ([R,G,B,A]).')
+      .describe('Unpacks the given packed RGB A1B5G5R5 value as an Array ([R,G,B,A]).'),
+
+    pack_u64_array: ->(arr) { arr.pack('Q*') }.returns(String),
+    pack_u32_array: ->(arr) { arr.pack('L*') }.returns(String),
+    pack_u16_array: ->(arr) { arr.pack('S*') }.returns(String),
+    pack_u8_array: ->(arr) { arr.pack('C*') }.returns(String),
+    pack_s64_array: ->(arr) { arr.pack('q*') }.returns(String),
+    pack_s32_array: ->(arr) { arr.pack('l*') }.returns(String),
+    pack_s16_array: ->(arr) { arr.pack('s*') }.returns(String),
+    pack_s8_array: ->(arr) { arr.pack('c*') }.returns(String),
+
+    unpack_u64_array: ->(byte_str) { byte_str.unpack('Q*') }.returns(Array),
+    unpack_u32_array: ->(byte_str) { byte_str.unpack('L*') }.returns(Array),
+    unpack_u16_array: ->(byte_str) { byte_str.unpack('S*') }.returns(Array),
+    unpack_u8_array: ->(byte_str) { byte_str.unpack('C*') }.returns(Array),
+    unpack_s64_array: ->(byte_str) { byte_str.unpack('q*') }.returns(Array),
+    unpack_s32_array: ->(byte_str) { byte_str.unpack('l*') }.returns(Array),
+    unpack_s16_array: ->(byte_str) { byte_str.unpack('s*') }.returns(Array),
+    unpack_s8_array: ->(byte_str) { byte_str.unpack('c*') }.returns(Array),
+
+    emulate_func: ->(loc,ov,*args) { Utils.emulate_func(loc,ov,*args) }.returns(Object).impure,
+    emu_get_reg: ->(reg_s) { $emu.read_reg(reg_s.to_sym) }.returns(Integer).impure,
+    emu_set_reg: ->(reg_s,val) { $emu.write_reg(reg_s.to_sym,val) }.impure,
+    emu_get_mem: ->(loc,size) { Utils.emu_get_mem(loc,size) }.returns(String).impure,
+    emu_set_mem: ->(loc,byte_str) { Utils.emu_set_mem(loc,byte_str) }.impure,
+    emu_load_ov: ->(ov_id) { $emu.load_overlay(ov_id) }.impure,
+    emu_reset: -> { $emu = Uc::Emu.new(); $emu.load_arm9 }.impure,
+
+    assemble_arm: ->(asm,addr=0) { Utils.assemble_arm(asm,addr:addr) }.returns(Integer),
+    assemble_thumb: ->(asm,addr=0) { Utils.assemble_thumb(asm,addr:addr) }.returns(Integer),
 
   },
 
@@ -839,6 +884,7 @@ module NCPP
     get_s8:        :get_signed_byte,
     get_cstr:      :get_cstring,
     disasm_ins:    :disasm_arm_ins,
+    disasm:        :disasm_arm_ins,
     disasm_hex_seq: :disasm_arm_hex_seq,
     disasm_hex_str: :disasm_arm_hex_seq,
     disasm_arm_hex_str: :disasm_arm_hex_seq,
@@ -876,7 +922,34 @@ module NCPP
     is_addr_in_ov:                :is_address_in_overlay,
     is_addr_in_arm9:              :is_address_in_arm9,
     is_addr_in_arm7:              :is_address_in_arm7,
-    find_hex_seq:                 :find_hex_bytes
+    find_hex_seq:                 :find_hex_bytes,
+    pack_u64_arr:                 :pack_u64_array,
+    pack_u32_arr:                 :pack_u32_array,
+    pack_u16_arr:                 :pack_u16_array,
+    pack_u8_arr:                  :pack_u8_array,
+    pack_s64_arr:                 :pack_s64_array,
+    pack_s32_arr:                 :pack_s32_array,
+    pack_s16_arr:                 :pack_s16_array,
+    pack_s8_arr:                  :pack_s8_array,
+    unpack_u64_arr:               :unpack_u64_array,
+    unpack_u32_arr:               :unpack_u32_array,
+    unpack_u16_arr:               :unpack_u16_array,
+    unpack_u8_arr:                :unpack_u8_array,
+    unpack_s64_arr:               :unpack_s64_array,
+    unpack_s32_arr:               :unpack_s32_array,
+    unpack_s16_arr:               :unpack_s16_array,
+    unpack_s8_arr:                :unpack_s8_array,
+    emulate_function:             :emulate_func,
+    emu_call_func:                :emulate_func,
+    emu_get_register:             :emu_get_reg,
+    emu_set_register:             :emu_set_reg,
+    emu_get_memory:               :emu_get_mem,
+    emu_set_memory:               :emu_set_mem,
+    emu_load_overlay:             :emu_load_ov,
+    assemble:                     :assemble_arm,
+    assemble_ins:                 :assemble_arm,
+    assemble_arm_ins:             :assemble_arm,
+    assemble_thumb_ins:           :assemble_thumb
   }).freeze
 
 
