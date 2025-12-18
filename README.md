@@ -1,6 +1,6 @@
 # NCPrePatcher
 
-A preprocessor for [NCPatcher](https://github.com/TheGameratorT/NCPatcher) with access to your NDS ROM and a disassembler.
+A preprocessor for [NCPatcher](https://github.com/TheGameratorT/NCPatcher) with access to your NDS ROM, a disassembler, an assembler, and an emulator.
 
 ## Installation
 
@@ -47,13 +47,19 @@ ncpp --help
 - Ruby
 - CMake and a modern C++ compiler
 - Rust and Cargo
+- vcpkg
 
-To build the required native libraries, go to /ext/ and run:
+To build the nitro and unarm native libraries, go to /ext/ and run:
 ```console
 ruby build.rb
 ```
 
-Then go back to the base directory and run:
+To build the unicorn and keystone native libraries run:
+```console
+vcpkg install unicorn keystone --triplet [your platform]-dynamic
+```
+
+Move the built binaries to `lib/unicorn` and `lib/keystone` respectively, and finally, go back to the base directory and run:
 ```console
 gem build ncpp.gemspec
 ```
@@ -64,3 +70,5 @@ gem build ncpp.gemspec
 - [unarm](https://github.com/AetiasHax/unarm) used for disassembling
 - [Ruby-FFI](https://github.com/ffi/ffi) used for binding the above libraries to Ruby
 - [Parslet](https://github.com/kschiess/parslet) used for parsing the DSL
+- [Unicorn](https://github.com/unicorn-engine/unicorn/tree/master) used for emulating
+- [Keystone](https://github.com/keystone-engine/keystone/tree/master) used for assembling
