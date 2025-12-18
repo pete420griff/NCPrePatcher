@@ -55,13 +55,15 @@ jobs:
       - name: Bootstrap vcpkg (Unix)
         if: runner.os != 'Windows'
         run: |
-          export VCPKG_ROOT="./vcpkg"
+          export VCPKG_ROOT="$(pwd)/vcpkg"
+          echo "VCPKG_ROOT=$VCPKG_ROOT"
           ./vcpkg/bootstrap-vcpkg.sh
 
       - name: Bootstrap vcpkg (Windows)
         if: runner.os == 'Windows'
         run: |
-          $env:VCPKG_ROOT = ".\vcpkg"
+          $env:VCPKG_ROOT = (Resolve-Path .\vcpkg).Path
+          echo "VCPKG_ROOT=$VCPKG_ROOT"
           .\vcpkg\bootstrap-vcpkg.bat
 
       - name: Run build script
