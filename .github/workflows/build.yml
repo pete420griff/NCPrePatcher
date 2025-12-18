@@ -55,49 +55,14 @@ jobs:
       - name: Bootstrap vcpkg (Unix)
         if: runner.os != 'Windows'
         run: |
+          export VCPKG_ROOT="./vcpkg"
           ./vcpkg/bootstrap-vcpkg.sh
 
       - name: Bootstrap vcpkg (Windows)
         if: runner.os == 'Windows'
         run: |
+          $env:VCPKG_ROOT = ".\vcpkg"
           .\vcpkg\bootstrap-vcpkg.bat
-
-      - name: Install vcpkg packages (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          ./vcpkg/vcpkg install unicorn keystone --triplet x64-linux-dynamic
-
-      - name: Install vcpkg packages (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          ./vcpkg/vcpkg install unicorn keystone --triplet arm64-osx-dynamic
-
-      - name: Install vcpkg packages (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          .\vcpkg\vcpkg.exe install unicorn keystone --triplet x64-windows
-
-      - name: Collect unicorn & keystone libraries (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: |
-          set -e
-
-          if [ "$RUNNER_OS" = "macOS" ]; then
-            TRIPLET=arm64-osx-dynamic
-            EXT=dylib
-          else
-            TRIPLET=x64-linux-dynamic
-            EXT=so
-          fi
-          ls vcpkg/installed/$TRIPLET/lib/
-          cp -v vcpkg/installed/$TRIPLET/lib/libunicorn.$EXT lib/unicorn/unicorn.$EXT || true
-          cp -v vcpkg/installed/$TRIPLET/lib/libkeystone.$EXT lib/keystone/keystone.$EXT || true
-
-      - name: Collect unicorn & keystone libraries (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          Copy-Item vcpkg\installed\x64-windows\bin\unicorn*.dll lib\unicorn\ -ErrorAction SilentlyContinue
-          Copy-Item vcpkg\installed\x64-windows\bin\keystone*.dll lib\keystone\ -ErrorAction SilentlyContinue
 
       - name: Run build script
         run: ruby ext/build.rb

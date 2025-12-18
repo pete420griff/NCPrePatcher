@@ -3,19 +3,19 @@ require 'rbconfig'
 require 'open3'
 
 module OS
-  def OS.windows?
+  def self.windows?
     (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
   end
 
-  def OS.mac?
+  def self.mac?
     (/darwin/ =~ RUBY_PLATFORM) != nil
   end
 
-  def OS.unix?
+  def self.unix?
     !OS.windows?
   end
 
-  def OS.linux?
+  def self.linux?
     OS.unix? and not OS.mac?
   end
 end
@@ -37,6 +37,19 @@ NITRO_LIB_NAME = (OS.unix? ? 'libnitro' : 'nitro') + LIB_EXT
 
 UNARM_BUILD_PATH = File.join(ROOT, 'unarm/')
 UNARM_LIB_NAME = (OS.unix? ? 'libunarm_c' : 'unarm_c') + LIB_EXT
+
+VCPKG_TRIPLET = case
+                when OS.windows?
+                  'x64-windows'
+                when OS.linux?
+                  'x64-linux-dynamic'
+                when OS.mac?
+                  "#{RUBY_PLATFORM.start_with?('arm64') ? 'arm64' : 'x64'}-osx-dynamic"
+                end
+
+VCPKG_ROOT = ENV.has_key?("VCPKG_ROOT") ? ENV['VCPKG_ROOT'] : './vcpkg'
+VCPKG_LIB_PATH = File.join(VCPKG_ROOT, "installed/#{VCPKG_TRIPLET}/#{OS.windows? ? 'bin' : 'lib'}/")
+
 
 def config_nitro
   # Create build folder if it doesn't exist
@@ -67,7 +80,7 @@ def build_nitro
   lib_dest = File.join(ROOT, '../lib/nitro/nitro' + LIB_EXT)
   puts "Moving #{lib_path} to #{lib_dest}"
   begin
-    FileUtils.move lib_path, lib_dest
+    FileUtils.move(lib_path, lib_dest)
   rescue
     puts "Error: file not found at #{lib_path}"
   end
@@ -87,14 +100,28 @@ def build_unarm
   lib_dest = File.join(ROOT, '../lib/unarm/unarm' + LIB_EXT)
   puts "Moving #{lib_path} to #{lib_dest}"
   begin
-    FileUtils.move lib_path, lib_dest
+    FileUtils.move(lib_path, lib_dest)
   rescue
     puts "Error: file not found at #{lib_path}"
   end
 end
 
+def build_vcpkg_lib(lib_name)
+  out, status = Open3.capture2e('vcpkg', 'install', lib_name, "--overlay-triplets=#{lib_name}/triplets")
+  puts out
+  unless status.success?
+    puts "Error: vcpkg command failed with status #{status.exitstatus}"
+    raise "Vcpkg #{lib_name} build failed"
+  end
+
+  lib_path = File.join(VCPKG_LIB_PATH, (OS.windows? ? '' : 'lib') + lib_name + LIB_EXT)
+  lib_dest = File.join(ROOT, "../lib/#{lib_name}/#{lib_name + LIB_EXT}")
+  FileUtils.copy(lib_path, lib_dest)
+end
+
+
 if $PROGRAM_NAME == __FILE__
-  if not Dir.exist? NITRO_BUILD_PATH or ARGV.include? '--config'
+  if !Dir.exist?(NITRO_BUILD_PATH) || ARGV.include?('--config')
     config_nitro
   end
 
@@ -108,7 +135,21 @@ if $PROGRAM_NAME == __FILE__
     return
   end
 
+  if ARGV.include? 'unicorn'
+    build_vcpkg_lib('unicorn')
+    return
+  end
+
+  if ARGV.include? 'keystone'
+    build_vcpkg_lib('keystone')
+    return
+  end
+
   build_nitro
   puts
   build_unarm
+  puts
+  build_vcpkg_lib('unicorn')
+  puts
+  build_vcpkg_lib('keystone')
 end

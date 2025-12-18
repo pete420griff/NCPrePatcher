@@ -49,17 +49,12 @@ ncpp --help
 - Rust and Cargo
 - vcpkg
 
-To build the nitro and unarm native libraries, go to /ext/ and run:
+To build the native libraries, go to /ext/ and run:
 ```console
 ruby build.rb
 ```
 
-To build the unicorn and keystone native libraries run:
-```console
-vcpkg install unicorn keystone --triplet [your platform]-dynamic
-```
-
-Move the built binaries to `lib/unicorn` and `lib/keystone` respectively, and finally, go back to the base directory and run:
+Finally, go back to the base directory and run:
 ```console
 gem build ncpp.gemspec
 ```
@@ -68,7 +63,7 @@ gem build ncpp.gemspec
 
 - Code from NCPatcher used by the **nitro** library
 - [unarm](https://github.com/AetiasHax/unarm) used for disassembling
+- [Keystone](https://github.com/keystone-engine/keystone/tree/master) used for assembling
+- [Unicorn](https://github.com/unicorn-engine/unicorn/tree/master) used for emulating
 - [Ruby-FFI](https://github.com/ffi/ffi) used for binding the above libraries to Ruby
 - [Parslet](https://github.com/kschiess/parslet) used for parsing the DSL
-- [Unicorn](https://github.com/unicorn-engine/unicorn/tree/master) used for emulating
-- [Keystone](https://github.com/keystone-engine/keystone/tree/master) used for assembling
