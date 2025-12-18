@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require_relative 'types.rb'
-require_relative 'version.rb'
+require_relative 'types'
+require_relative 'version'
 
 module NCPP
 

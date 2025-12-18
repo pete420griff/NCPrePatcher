@@ -1,8 +1,8 @@
-require_relative 'nitro/nitro.rb'
-require_relative 'unarm/unarm.rb'
-require_relative 'unicorn/unicorn.rb'
-require_relative 'keystone/keystone.rb'
-require_relative 'ncpp/interpreter.rb'
+require_relative 'nitro/nitro'
+require_relative 'unarm/unarm'
+require_relative 'unicorn/unicorn'
+require_relative 'keystone/keystone'
+require_relative 'ncpp/interpreter'
 
 require 'json'
 require 'optparse'

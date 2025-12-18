@@ -1,6 +1,6 @@
-require_relative '../nitro/nitro.rb'
-require_relative '../unarm/unarm.rb'
-require_relative '../unicorn/unicorn.rb'
+require_relative '../nitro/nitro'
+require_relative '../unarm/unarm'
+require_relative '../unicorn/unicorn'
 
 require 'did_you_mean/jaro_winkler'
 require 'did_you_mean/levenshtein'

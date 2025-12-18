@@ -1,7 +1,7 @@
 require 'ffi'
 
-require_relative 'arm_const.rb'
-require_relative 'unicorn_const.rb'
+require_relative 'arm_const'
+require_relative 'unicorn_const'
 
 include UnicornEngine
 

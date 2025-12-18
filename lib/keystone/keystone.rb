@@ -1,8 +1,8 @@
 require 'ffi'
 
-require_relative 'arm_const.rb'
-require_relative 'keystone_const.rb'
-require_relative 'version.rb'
+require_relative 'arm_const'
+require_relative 'keystone_const'
+require_relative 'version'
 
 module KeystoneBind
   extend FFI::Library

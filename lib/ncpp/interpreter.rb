@@ -1,5 +1,5 @@
-require_relative 'parser.rb'
-require_relative 'commands.rb'
+require_relative 'parser'
+require_relative 'commands'
 
 require 'fileutils'
 
