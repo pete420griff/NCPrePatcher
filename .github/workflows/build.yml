@@ -65,12 +65,12 @@ jobs:
       - name: Install vcpkg packages (Linux)
         if: runner.os == 'Linux'
         run: |
-          ./vcpkg/vcpkg install unicorn keystone --triplet x64-linux
+          ./vcpkg/vcpkg install unicorn keystone --triplet x64-linux-dynamic
 
       - name: Install vcpkg packages (macOS)
         if: runner.os == 'macOS'
         run: |
-          ./vcpkg/vcpkg install unicorn keystone --triplet arm64-osx
+          ./vcpkg/vcpkg install unicorn keystone --triplet arm64-osx-dynamic
 
       - name: Install vcpkg packages (Windows)
         if: runner.os == 'Windows'
@@ -81,30 +81,22 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           set -e
-          mkdir -p lib/unicorn lib/keystone
 
           if [ "$RUNNER_OS" = "macOS" ]; then
-            TRIPLET=arm64-osx
+            TRIPLET=arm64-osx-dynamic
+            EXT=dylib
           else
-            TRIPLET=x64-linux
+            TRIPLET=x64-linux-dynamic
+            EXT=so
           fi
-
-          cp -v vcpkg/installed/$TRIPLET/lib/libunicorn* lib/unicorn/ || true
-          cp -v vcpkg/installed/$TRIPLET/lib/libkeystone* lib/keystone/ || true
-
-          cp -v vcpkg/installed/$TRIPLET/bin/libunicorn* lib/unicorn/ || true
-          cp -v vcpkg/installed/$TRIPLET/bin/libkeystone* lib/keystone/ || true
+          ls vcpkg/installed/$TRIPLET/lib/
+          cp -v vcpkg/installed/$TRIPLET/lib/libunicorn.$EXT lib/unicorn/unicorn.$EXT || true
+          cp -v vcpkg/installed/$TRIPLET/lib/libkeystone.$EXT lib/keystone/keystone.$EXT || true
 
       - name: Collect unicorn & keystone libraries (Windows)
         if: runner.os == 'Windows'
         run: |
-          New-Item -ItemType Directory -Force lib\unicorn | Out-Null
-          New-Item -ItemType Directory -Force lib\keystone | Out-Null
-
-          Copy-Item vcpkg\installed\x64-windows\lib\unicorn*.lib lib\unicorn\ -ErrorAction SilentlyContinue
           Copy-Item vcpkg\installed\x64-windows\bin\unicorn*.dll lib\unicorn\ -ErrorAction SilentlyContinue
-
-          Copy-Item vcpkg\installed\x64-windows\lib\keystone*.lib lib\keystone\ -ErrorAction SilentlyContinue
           Copy-Item vcpkg\installed\x64-windows\bin\keystone*.dll lib\keystone\ -ErrorAction SilentlyContinue
 
       - name: Run build script
