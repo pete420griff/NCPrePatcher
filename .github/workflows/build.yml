@@ -20,10 +20,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Ruby
+      - name: Set up Ruby (Unix)
+      if runner.os != 'Windows'
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.4'
+
+      - name: Set up Ruby (Windows)
+      if runner.os == 'Windows'
+      run: |
+        choco install ruby --version=3.4 --yes
+        refreshenv
+        ruby -v
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
