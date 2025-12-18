@@ -21,13 +21,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Ruby (Unix)
-      if runner.os != 'Windows'
+      if: runner.os != 'Windows'
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.4'
 
       - name: Set up Ruby (Windows)
-      if runner.os == 'Windows'
+      if: runner.os == 'Windows'
       run: |
         choco install ruby --version=3.4 --yes
         refreshenv
