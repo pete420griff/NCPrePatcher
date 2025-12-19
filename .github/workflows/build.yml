@@ -62,7 +62,7 @@ jobs:
       - name: Bootstrap vcpkg (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo VCPKG_ROOT=${GITHUB_WORKSPACE}\vcpkg >> $env:GITHUB_ENV
+          "VCPKG_ROOT=$env:GITHUB_WORKSPACE\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           .\vcpkg\bootstrap-vcpkg.bat
 
       - name: Run build script
