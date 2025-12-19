@@ -109,7 +109,7 @@ module Build
   end
 
   def self.build_vcpkg_lib(lib_name)
-    out, status = Open3.capture2e('vcpkg', 'install', lib_name, "--overlay-triplets=#{lib_name}/triplets")
+    out, status = Open3.capture2e(File.join(VCPKG_ROOT,'vcpkg'), 'install', lib_name, "--overlay-triplets=#{lib_name}/triplets")
     puts out
     unless status.success?
       puts "Error: vcpkg command failed with status #{status.exitstatus}"

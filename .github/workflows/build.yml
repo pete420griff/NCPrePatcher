@@ -13,6 +13,9 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
 
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,16 +48,22 @@ jobs:
         run: |
           choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --yes
 
-      - name: Use system vcpkg (Unix)
+      - name: Clone vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+
+      - name: Bootstrap vcpkg (Unix)
         if: runner.os != 'Windows'
         run: |
-          echo "VCPKG_ROOT=/usr/local/share/vcpkg" >> $GITHUB_ENV
+          export VCPKG_ROOT="$(pwd)/vcpkg"
+          echo "VCPKG_ROOT=${GITHUB_WORKSPACE}/vcpkg" >> $GITHUB_ENV
+          ./vcpkg/bootstrap-vcpkg.sh
 
-      - name: Use system vcpkg (Windows)
+      - name: Bootstrap vcpkg (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
         run: |
-          "VCPKG_ROOT=C:\vcpkg" | Out-File -Append $env:GITHUB_ENV
+          echo VCPKG_ROOT=${GITHUB_WORKSPACE}\vcpkg >> $env:GITHUB_ENV
+          .\vcpkg\bootstrap-vcpkg.bat
 
       - name: Run build script
         run: ruby ext/build.rb
