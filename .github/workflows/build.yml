@@ -67,8 +67,8 @@ jobs:
 
       - name: Run build script
         run: |
-          cd ${GITHUB_WORKSPACE}/ext
-          ruby ext/build.rb
+          cd ext
+          ruby build.rb
 
       - name: Build gem
         run: gem build ncpp.gemspec
