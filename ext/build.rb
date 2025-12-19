@@ -49,7 +49,7 @@ module Build
                     "#{RUBY_PLATFORM.start_with?('arm64') ? 'arm64' : 'x64'}-osx-dynamic"
                   end
 
-  VCPKG_ROOT = ENV.has_key?("VCPKG_ROOT") ? ENV['VCPKG_ROOT'] : './vcpkg'
+  VCPKG_ROOT = ENV.has_key?("VCPKG_ROOT") ? ENV['VCPKG_ROOT'] : File.join(ROOT,'vcpkg')
   VCPKG_LIB_PATH = File.join(VCPKG_ROOT, "installed/#{VCPKG_TRIPLET}/#{OS.windows? ? 'bin' : 'lib'}/")
 
 
@@ -110,7 +110,7 @@ module Build
 
   def self.build_vcpkg_lib(lib_name)
     out, status = Open3.capture2e(File.join(VCPKG_ROOT,'vcpkg'), 'install', lib_name, "--triplet=#{VCPKG_TRIPLET}",
-                                  "--overlay-triplets=#{lib_name}/triplets")
+                                  "--overlay-triplets=#{File.join(lib_name,'triplets')}")
     puts out
     unless status.success?
       puts "Error: vcpkg command failed with status #{status.exitstatus}"
