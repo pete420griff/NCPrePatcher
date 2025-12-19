@@ -66,7 +66,10 @@ jobs:
           .\vcpkg\bootstrap-vcpkg.bat
 
       - name: Run build script
-        run: ruby ext/build.rb
+        run: |
+          cd ext
+          ruby ext/build.rb
+          cd ..
 
       - name: Build gem
         run: gem build ncpp.gemspec
